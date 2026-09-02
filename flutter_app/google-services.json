@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "692675485357",
+    "project_id": "cinnamon-pepper-price-ap-55716",
+    "storage_bucket": "cinnamon-pepper-price-ap-55716.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:692675485357:android:2cc43d82a1c37464947024",
+        "android_client_info": {
+          "package_name": "com.dasun.pricepredictionapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUHjWxnICSY80U9q7ajjdoCsxTtSWdTqc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

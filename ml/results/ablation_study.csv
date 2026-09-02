@@ -1,0 +1,6 @@
+Configuration,Num Features,R2 Score,MAE (Rs/kg),RMSE (Rs/kg),R2 Improvement
+A: Price Lags Only (Baseline),5,0.865,103.63,181.45,0.0
+B: + Calendar (Month/Week),7,0.86,109.67,184.79,-0.58
+C: + Harvest/Season,9,0.8557,110.03,187.62,-1.08
+D: + Climate (NASA POWER),13,0.8542,109.98,188.54,-1.24
+E: Full Model (+ Crop/Dist),16,0.8599,110.29,184.86,-0.59

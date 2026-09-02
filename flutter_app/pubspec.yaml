@@ -1,0 +1,46 @@
+name: price_prediction_app
+description: Price Prediction and Decision Support System for Minor Export Crops in Sri Lanka
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.8.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Firebase
+  firebase_core: ^3.13.1
+  firebase_auth: ^5.5.2
+  firebase_messaging: ^15.2.5
+  # HTTP calls to Flask API
+  http: ^1.4.0
+  # Charts for price history
+  fl_chart: ^0.70.2
+  # Local storage for login state and API URL
+  shared_preferences: ^2.5.3
+  # Google Sign-In for Android
+  google_sign_in: ^6.2.2
+  # Icons
+  cupertino_icons: ^1.0.8
+  # Biometric (Face/Fingerprint) + PIN fallback
+  local_auth: ^2.3.0
+  # For hashing the PIN fallback (never store PIN in plaintext)
+  crypto: ^3.0.6
+  
+  flutter_secure_storage: ^9.2.2
+
+  geolocator: ^13.0.1
+  geocoding: ^3.0.0
+
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/onboarding/

@@ -1,0 +1,29 @@
+﻿# Python
+__pycache__/
+*.pyc
+*.db
+backend/.env
+backend/live_test.db
+backend/test_price_data.db
+.pytest_cache/
+
+# Node / Playwright
+node_modules/
+test-results/
+playwright-report/
+
+# Flutter
+flutter_app/build/
+flutter_app/.dart_tool/
+flutter_app/.flutter-plugins
+flutter_app/.flutter-plugins-dependencies
+
+# Sensitive credentials
+backend/cinnamon-pepper-price-ap-55716-firebase-adminsdk-fbsvc-9e77953f8b.json
+*firebase-adminsdk*.json
+*serviceaccount*.json
+.env
+
+# OS
+.DS_Store
+Thumbs.db

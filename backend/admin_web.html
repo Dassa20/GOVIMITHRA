@@ -1,0 +1,2641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crop Price Predictor — Admin Panel</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+/* ============================================================
+   CROP PRICE PREDICTOR — ADMIN PANEL
+   Design system: "Field Ledger"
+   Deep pine + parchment surfaces + harvest amber accent.
+   NOTE: every class name is identical to the original, so all
+   existing JavaScript keeps working untouched.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Core brand — deep pine */
+  --green:       #1f5c3d;
+  --green-dark:  #143f2a;
+  --green-light: #eaf3ec;
+
+  /* Accent — harvest amber */
+  --amber:  #c8791a;
+
+  /* Semantic */
+  --blue:   #1c6ea4;
+  --orange: #c26315;
+  --red:    #b3372e;
+
+  /* Surfaces & text */
+  --grey:   #f4f6f4;
+  --border: #e3e8e3;
+  --text:   #1c2620;
+  --sub:    #6a7a70;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(20,40,30,0.06), 0 1px 3px rgba(20,40,30,0.04);
+  --shadow-md: 0 2px 8px rgba(20,40,30,0.08), 0 4px 16px rgba(20,40,30,0.05);
+  --shadow-lg: 0 8px 32px rgba(20,40,30,0.16);
+
+  --radius:    12px;
+  --radius-sm: 8px;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: #eef2ee;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.45;
+}
+
+/* ── LAYOUT ── */
+.sidebar {
+  width: 236px;
+  background: linear-gradient(180deg, var(--green) 0%, var(--green-dark) 100%);
+  color: white;
+  position: fixed; top: 0; left: 0; height: 100vh;
+  display: flex; flex-direction: column; padding: 0;
+  z-index: 100;
+  box-shadow: 2px 0 16px rgba(20,40,30,0.12);
+}
+.sidebar-logo {
+  padding: 22px 20px; border-bottom: 1px solid rgba(255,255,255,0.12);
+  font-family: 'Fraunces', serif;
+  font-weight: 600; font-size: 17px; line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.sidebar-logo small {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500; font-size: 11px; opacity: 0.6;
+  display: block; margin-top: 3px; letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.sidebar nav { flex: 1; padding: 12px 0; }
+.nav-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 20px; margin: 1px 10px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 14px; font-weight: 500;
+  transition: background 0.16s;
+  color: rgba(255,255,255,0.86);
+}
+.nav-item:hover { background: rgba(255,255,255,0.10); }
+.nav-item.active {
+  background: rgba(255,255,255,0.16); font-weight: 600; color: white;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+.nav-item span.icon { font-size: 17px; opacity: 0.95; }
+.sidebar-footer {
+  padding: 14px 20px; border-top: 1px solid rgba(255,255,255,0.12);
+  font-size: 12px; opacity: 0.72; line-height: 1.5;
+}
+
+.main { margin-left: 236px; min-height: 100vh; }
+.topbar {
+  background: rgba(255,255,255,0.86);
+  backdrop-filter: blur(8px);
+  padding: 14px 28px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 50;
+}
+.topbar h1 {
+  font-family: 'Fraunces', serif;
+  font-size: 20px; font-weight: 600; letter-spacing: -0.01em;
+}
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.badge {
+  background: var(--amber); color: white; border-radius: 99px;
+  font-size: 11px; padding: 2px 8px; font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+
+.content { padding: 28px; max-width: 1500px; }
+.page { display: none; animation: fadeIn 0.25s ease; }
+.page.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* ── CARDS ── */
+.card {
+  background: white; border-radius: var(--radius); padding: 22px;
+  box-shadow: var(--shadow-sm); margin-bottom: 18px;
+  border: 1px solid var(--border);
+}
+.card-title {
+  font-family: 'Fraunces', serif;
+  font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--green);
+  letter-spacing: -0.01em;
+}
+.stats-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 16px; margin-bottom: 22px;
+}
+.stat-card {
+  background: white; border-radius: var(--radius); padding: 20px;
+  box-shadow: var(--shadow-sm); border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 6px;
+  position: relative; overflow: hidden;
+  transition: box-shadow 0.18s, transform 0.18s;
+}
+.stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.stat-card::before {
+  content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 3px;
+  background: var(--green);
+}
+.stat-card.green::before  { background: var(--green); }
+.stat-card.blue::before   { background: var(--blue); }
+.stat-card.orange::before { background: var(--amber); }
+.stat-card.red::before    { background: var(--red); }
+.stat-card .label {
+  font-size: 11px; color: var(--sub); text-transform: uppercase;
+  letter-spacing: 0.06em; font-weight: 600;
+}
+.stat-card .value {
+  font-family: 'Fraunces', serif;
+  font-size: 30px; font-weight: 600; letter-spacing: -0.02em;
+}
+.stat-card .sub { font-size: 12px; color: var(--sub); }
+.stat-card.green .value { color: var(--green); }
+.stat-card.blue  .value { color: var(--blue); }
+.stat-card.orange .value { color: var(--amber); }
+.stat-card.red   .value { color: var(--red); }
+
+/* ── TABLES ── */
+.table-wrap { overflow-x: auto; border-radius: var(--radius-sm); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th {
+  background: var(--green); color: white; padding: 11px 14px;
+  text-align: left; font-weight: 600; white-space: nowrap;
+  font-size: 12px; letter-spacing: 0.02em;
+}
+th:first-child { border-top-left-radius: var(--radius-sm); }
+th:last-child  { border-top-right-radius: var(--radius-sm); }
+td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:hover td { background: var(--green-light); }
+tr:last-child td { border-bottom: none; }
+
+/* ── FORMS ── */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full { grid-column: 1 / -1; }
+label {
+  font-size: 11px; font-weight: 600; color: var(--sub);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+input, select, textarea {
+  padding: 10px 13px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 14px; font-family: inherit; background: white; color: var(--text);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none; border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(31,92,61,0.12);
+}
+.btn {
+  padding: 10px 20px; border: none; border-radius: var(--radius-sm); font-size: 14px;
+  font-weight: 600; cursor: pointer; font-family: inherit;
+  transition: transform 0.12s, box-shadow 0.12s, opacity 0.12s;
+  box-shadow: var(--shadow-sm);
+}
+.btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.btn:active { transform: translateY(0); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-green  { background: var(--green);  color: white; }
+.btn-blue   { background: var(--blue);   color: white; }
+.btn-orange { background: var(--amber);  color: white; }
+.btn-red    { background: var(--red);    color: white; }
+.btn-outline {
+  background: white; border: 1.5px solid var(--green); color: var(--green);
+  box-shadow: none;
+}
+.btn-outline:hover { background: var(--green-light); }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+
+/* ── STATUS PILLS ── */
+.pill {
+  display: inline-block; padding: 3px 11px; border-radius: 99px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pill-pending  { background: #fbeede; color: #a5560f; }
+.pill-approved { background: #e2f0e6; color: #1f5c3d; }
+.pill-rejected { background: #f7e0de; color: #9e2f27; }
+.pill-staff    { background: #e0edf5; color: #1c6ea4; }
+.pill-super    { background: #ece2f2; color: #6A1B9A; }
+
+/* ── FILTER BAR ── */
+.filter-bar {
+  background: white; border-radius: var(--radius); padding: 16px 20px;
+  box-shadow: var(--shadow-sm); margin-bottom: 18px; border: 1px solid var(--border);
+  display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+}
+.filter-bar .form-group { flex: 1; min-width: 140px; }
+.filter-bar .btn { align-self: flex-end; }
+
+/* ── ALERTS ── */
+.alert {
+  padding: 12px 16px; border-radius: var(--radius-sm); font-size: 13px;
+  margin-bottom: 12px; display: none; font-weight: 500;
+}
+.alert.show { display: block; }
+.alert-success { background: #e2f0e6; color: #164a30; border: 1px solid #b6d8c1; }
+.alert-error   { background: #f7e0de; color: #8a281f; border: 1px solid #e4b0ab; }
+.alert-info    { background: #e0edf5; color: #12496e; border: 1px solid #a9cde3; }
+
+/* ── LOGIN ── */
+#login-page {
+  min-height: 100vh; display: flex; align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1f5c3d 0%, #143f2a 100%);
+  position: relative;
+}
+#login-page::before {
+  content: ''; position: absolute; inset: 0;
+  background-image: radial-gradient(circle at 20% 30%, rgba(200,121,26,0.10) 0, transparent 40%),
+                    radial-gradient(circle at 80% 70%, rgba(255,255,255,0.06) 0, transparent 40%);
+}
+.login-box {
+  background: white; border-radius: 18px; padding: 40px 34px;
+  box-shadow: var(--shadow-lg); width: 380px; max-width: 95vw;
+  position: relative; z-index: 1;
+}
+.login-logo { text-align: center; margin-bottom: 26px; }
+.login-logo .icon { font-size: 50px; }
+.login-logo h2 {
+  font-family: 'Fraunces', serif;
+  font-size: 22px; margin-top: 10px; color: var(--green); font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.login-logo p  { font-size: 13px; color: var(--sub); margin-top: 4px; }
+
+/* ── MODAL ── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(20,40,30,0.48); z-index: 999;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: white; border-radius: 16px; padding: 30px;
+  min-width: 340px; max-width: 560px; width: 90vw;
+  box-shadow: var(--shadow-lg); max-height: 90vh; overflow-y: auto;
+  animation: modalPop 0.2s ease;
+}
+@keyframes modalPop { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+.modal-title {
+  font-family: 'Fraunces', serif;
+  font-size: 17px; font-weight: 600; margin-bottom: 20px;
+}
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  .sidebar { transform: translateX(-100%); transition: transform 0.2s; }
+  .sidebar.open { transform: none; }
+  .main { margin-left: 0; }
+  .form-grid { grid-template-columns: 1fr; }
+  .content { padding: 18px; }
+}
+
+/* ── ACCESSIBILITY ── */
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- LOGIN PAGE                                 -->
+<!-- ══════════════════════════════════════════ -->
+<div id="login-page">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="icon">🌿</div>
+      <h2>Crop Price Predictor</h2>
+      <p>Admin Web Panel — DEA Staff &amp; System Admin</p>
+    </div>
+    <!-- First-run URL setup: only shown when API URL not yet saved -->
+    <div id="first-run-setup" style="display:none;margin-bottom:16px;padding:12px 14px;background:#fff8e1;border-radius:8px;border:1px solid #ffe082">
+      <p style="font-size:13px;font-weight:600;color:#E65100;margin-bottom:6px">⚙ First time — enter Flask server URL</p>
+      <p style="font-size:11px;color:#666;margin-bottom:8px">Check Flask startup log for your IP, e.g. <code>http://YOUR-PC-IP:5000</code></p>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="first-run-url" placeholder="http://10.16.x.x:5000" style="flex:1;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px">
+        <button onclick="saveFirstRunUrl()" style="padding:8px 14px;background:#2E7D32;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap">Save URL</button>
+      </div>
+    </div>
+    <div class="alert alert-error" id="login-error"></div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label for="login-user">Username</label>
+      <input type="text" id="login-user" placeholder="admin" autocomplete="username">
+    </div>
+    <div class="form-group" style="margin-bottom:16px">
+      <label for="login-pass">Password</label>
+      <input type="password" id="login-pass" placeholder="Password" onkeydown="if(event.key==='Enter') doLogin()" autocomplete="current-password">
+    </div>
+    <button class="btn btn-green" style="width:100%" onclick="doLogin()" id="login-btn">Login</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+      <p style="font-size:11px;color:var(--sub);margin:0" id="server-status">⬤ Checking server...</p>
+      <p style="font-size:11px;color:var(--sub);margin:0">Default: admin / Admin@1234</p>
+    </div>
+  </div></div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- MAIN APP                                   -->
+<!-- ══════════════════════════════════════════ -->
+<div id="app-shell" style="display:none">
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      🌿 Crop Price Predictor
+      <small>Admin Web Panel</small>
+    </div>
+    <nav id="nav"></nav>
+    <div class="sidebar-footer" id="user-info"></div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <h1 id="page-title">Dashboard</h1>
+      <div class="topbar-right">
+        <span id="pending-badge" class="badge" style="display:none">0</span>
+        <button class="btn btn-outline" onclick="doLogout()" style="font-size:12px;padding:6px 12px">Logout</button>
+      </div>
+    </div>
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div class="stats-grid" id="stats-grid"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="card">
+            <div class="card-title">Price trend — last 16 weeks</div>
+            <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+              <div class="form-group" style="margin-bottom:0;flex:1;min-width:110px">
+                <label for="dash-crop">Crop</label>
+                <select id="dash-crop" onchange="dashCropChanged()"></select>
+              </div>
+              <div class="form-group" style="margin-bottom:0;flex:1;min-width:110px">
+                <label for="dash-district">District</label>
+                <select id="dash-district" onchange="dashDistrictChanged()"></select>
+              </div>
+              <div class="form-group" style="margin-bottom:0;flex:1;min-width:110px">
+                <label for="dash-grade">Grade</label>
+                <select id="dash-grade" onchange="loadDashboardChart()"></select>
+              </div>
+            </div>
+            <canvas id="trend-chart" height="200"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-title">Latest predictions</div>
+            <div id="latest-predictions"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRICE TABLE -->
+      <div class="page" id="page-prices">
+        <div class="filter-bar">
+          <div class="form-group">
+            <label for="f-crop">Crop</label>
+            <select id="f-crop" onchange="filterCropChanged()"></select>
+          </div>
+          <div class="form-group">
+            <label for="f-district">District</label>
+            <select id="f-district" onchange="filterDistrictChanged()"><option value="">All</option></select>
+          </div>
+          <div class="form-group">
+            <label for="f-grade">Grade</label>
+            <select id="f-grade"><option value="">All</option></select>
+          </div>
+          <div class="form-group">
+            <label for="f-from">From date</label>
+            <input type="date" id="f-from">
+          </div>
+          <div class="form-group">
+            <label for="f-to">To date</label>
+            <input type="date" id="f-to">
+          </div>
+          <button class="btn btn-green" onclick="loadPriceTable()">Search</button>
+          <button class="btn btn-outline" onclick="resetFilters()">Reset</button>
+          <button class="btn btn-blue"   onclick="exportExcel()">⬇ Excel</button>
+          <button class="btn btn-orange" onclick="exportPDF()">⬇ PDF</button>
+        </div>
+        <div class="card">
+          <div class="card-title">Price history <span id="price-count" style="font-weight:400;color:var(--sub);font-size:13px"></span></div>
+          <div class="table-wrap"><table id="price-table">
+            <thead><tr>
+              <th>Date</th><th>Crop</th><th>District</th><th>Grade</th>
+              <th>Avg Price (Rs)</th><th>High Price (Rs)</th>
+              <th>Rainfall (mm)</th><th>Temp (°C)</th><th>Humidity (%)</th>
+              <th>Lag-1 (Rs)</th><th>MA-4 (Rs)</th><th>Harvest?</th><th>Season</th><th>Action</th>
+            </tr></thead>
+            <tbody id="price-tbody"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- SUBMIT CORRECTION (DEA staff OR super admin for missing/wrong data) -->
+      <div class="page" id="page-submit">
+        <div class="card">
+          <div class="card-title">Submit Data Correction</div>
+          <p style="font-size:13px;color:var(--sub);margin-bottom:14px">
+            Use this form only to correct missing or incorrect data. 
+            Weekly prices are fetched automatically from exagri.info every hour.
+            <span id="staff-correction-note"></span>
+          </p>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="s-date">Week Date (DD.MM.YYYY) *</label>
+              <input type="text" id="s-date" placeholder="30.06.2026">
+            </div>
+            <div class="form-group">
+              <label for="s-crop">Crop *</label>
+              <select id="s-crop" onchange="submitCropChanged()"><option value="">Select crop</option></select>
+            </div>
+            <div class="form-group">
+              <label for="s-district">District *</label>
+              <select id="s-district" onchange="submitDistrictChanged()"><option value="">Select district</option></select>
+            </div>
+            <div class="form-group">
+              <label for="s-grade">Grade *</label>
+              <select id="s-grade"><option value="">Select grade</option></select>
+            </div>
+            <div class="form-group">
+              <label for="s-avg">Average Price (Rs/kg) *</label>
+              <input type="number" id="s-avg" placeholder="6500">
+            </div>
+            <div class="form-group">
+              <label for="s-high">Highest Price (Rs/kg)</label>
+              <input type="number" id="s-high" placeholder="Optional">
+            </div>
+            <div class="form-group">
+              <label for="s-rain">Rainfall (mm)</label>
+              <input type="number" id="s-rain" placeholder="Auto-fetched from NASA if blank">
+            </div>
+            <div class="form-group">
+              <label for="s-temp">Temperature (°C)</label>
+              <input type="number" id="s-temp" placeholder="Auto-fetched from NASA if blank">
+            </div>
+            <div class="form-group">
+              <label for="s-humidity">Humidity (%)</label>
+              <input type="number" id="s-humidity" placeholder="Auto-fetched from NASA if blank">
+            </div>
+            <div class="form-group full">
+              <label for="s-notes">Reason for correction *</label>
+              <input type="text" id="s-notes" placeholder="e.g. Missing week, incorrect price from bulletin">
+            </div>
+          </div>
+          <div class="alert alert-success" id="submit-ok"></div>
+          <div class="alert alert-error"   id="submit-err"></div>
+          <div class="btn-row">
+            <button class="btn btn-green" onclick="submitPrice()" id="submit-btn">Submit Correction</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PENDING REQUESTS (super admin) -->
+      <div class="page" id="page-requests">
+        <div class="card">
+          <div class="card-title">Pending price update requests</div>
+          <div class="alert alert-success" id="req-ok"></div>
+          <div class="alert alert-error"   id="req-err"></div>
+          <div class="table-wrap"><table>
+            <thead><tr>
+              <th>ID</th><th>Submitted by</th><th>Date</th>
+              <th>Crop</th><th>District</th><th>Grade</th>
+              <th>Avg Price</th><th>Weather</th><th>Notes</th>
+              <th>Submitted at</th><th>Action</th>
+            </tr></thead>
+            <tbody id="req-tbody"></tbody>
+          </table></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">All requests history</div>
+          <div class="table-wrap"><table>
+            <thead><tr>
+              <th>ID</th><th>By</th><th>Crop</th><th>District</th>
+              <th>Grade</th><th>Date</th><th>Avg</th>
+              <th>Status</th><th>Reviewed by</th><th>Note</th>
+            </tr></thead>
+            <tbody id="all-req-tbody"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- MY REQUESTS (DEA staff) -->
+      <div class="page" id="page-my-requests">
+        <div class="card">
+          <div class="card-title">My submitted requests</div>
+          <div class="table-wrap"><table>
+            <thead><tr>
+              <th>ID</th><th>Date</th><th>Crop</th><th>District</th>
+              <th>Grade</th><th>Avg Price</th><th>Status</th><th>Review note</th><th>Submitted at</th>
+            </tr></thead>
+            <tbody id="my-req-tbody"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- ACCOUNTS (super admin) -->
+      <div class="page" id="page-accounts">
+        <div class="card">
+          <div class="card-title">Create new account</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="a-user">Username *</label>
+              <input type="text" id="a-user" placeholder="dea_galle_01">
+            </div>
+            <div class="form-group">
+              <label for="a-pass">Password *</label>
+              <input type="password" id="a-pass" placeholder="Min 6 chars">
+            </div>
+            <div class="form-group">
+              <label for="a-name">Full name</label>
+              <input type="text" id="a-name" placeholder="Name">
+            </div>
+            <div class="form-group">
+              <label for="a-email">Email</label>
+              <input type="email" id="a-email" placeholder="officer@dea.gov.lk">
+            </div>
+            <div class="form-group">
+              <label for="a-role">Role</label>
+              <select id="a-role">
+                <option value="dea_staff">DEA Staff</option>
+                <option value="super_admin">Super Admin</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="a-district">Assigned district</label>
+              <select id="a-district"><option value="">All districts</option></select>
+            </div>
+            <div class="form-group">
+              <label for="a-crop">Assigned crop</label>
+              <select id="a-crop"><option value="">All crops</option></select>
+            </div>
+          </div>
+          <div class="alert alert-success" id="acc-ok"></div>
+          <div class="alert alert-error"   id="acc-err"></div>
+          <div class="btn-row">
+            <button class="btn btn-green" onclick="createAccount()">Create account</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">All admin accounts</div>
+          <div class="table-wrap"><table>
+            <thead><tr>
+              <th>Username</th><th>Full Name</th><th>Role</th>
+              <th>District</th><th>Crop</th><th>Email</th><th>Created</th><th>Action</th>
+            </tr></thead>
+            <tbody id="accounts-tbody"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- REPORTS -->
+      <div class="page" id="page-reports">
+        <div class="card">
+          <div class="card-title">Generate Reports</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="r-type">Report type</label>
+              <select id="r-type">
+                <option value="price_summary">Price Summary</option>
+                <option value="weekly_comparison">Weekly Price Comparison</option>
+                <option value="weather_impact">Weather Impact Report</option>
+                <option value="prediction_accuracy">Prediction vs Actual</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="r-crop">Crop</label>
+              <select id="r-crop"><option value="">All crops</option></select>
+            </div>
+            <div class="form-group">
+              <label for="r-district">District</label>
+              <select id="r-district"><option value="">All districts</option></select>
+            </div>
+            <div class="form-group">
+              <label for="r-grade">Grade</label>
+              <select id="r-grade"><option value="">All grades</option></select>
+            </div>
+            <div class="form-group">
+              <label for="r-from">From date</label>
+              <input type="date" id="r-from">
+            </div>
+            <div class="form-group">
+              <label for="r-to">To date</label>
+              <input type="date" id="r-to">
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-green"  onclick="generateReport('preview')">Preview</button>
+            <button class="btn btn-blue"   onclick="generateReport('excel')">⬇ Download Excel</button>
+            <button class="btn btn-orange" onclick="generateReport('pdf')">⬇ Download PDF</button>
+          </div>
+        </div>
+
+        <div class="card" id="report-preview" style="display:none">
+          <div class="card-title" id="report-title">Report</div>
+          <div class="table-wrap"><table>
+            <thead><tr id="report-thead"></tr></thead>
+            <tbody id="report-tbody"></tbody>
+          </table></div>
+          <div id="report-summary" style="margin-top:16px;font-size:13px;color:var(--sub)"></div>
+        </div>
+      </div>
+
+      <!-- AUTO FETCH (super admin) -->
+      <div class="page" id="page-autofetch">
+        <!-- Next Fetch Info Card -->
+        <div class="card" id="next-fetch-card">
+          <div class="card-title">📅 Data Source Status</div>
+          <div id="next-fetch-content" style="font-size:13px;color:var(--sub)">Loading...</div>
+          <button class="btn btn-outline" onclick="loadNextFetchInfo()" style="margin-top:12px;font-size:12px;padding:5px 12px">🔄 Refresh</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Auto Data Collection</div>
+          <div style="background:#e8f5e9;border-radius:8px;padding:12px 16px;margin-bottom:16px;border-left:4px solid var(--green)">
+            <strong>✅ Fully Automatic</strong> — Flask backend runs a background thread every hour automatically.<br>
+            <span style="font-size:12px;color:#555">No need to keep this panel open. Data is collected even when you are not logged in.</span>
+          </div>
+          <p style="font-size:13px;color:var(--sub);margin-bottom:16px">
+            You can also trigger manually below at any time (e.g. to get data immediately after Flask restart).
+          </p>
+          <div class="btn-row" style="margin-bottom:20px">
+            <button class="btn btn-green" onclick="fetchWeather()" id="btn-weather">
+              ☁ Fetch NASA Weather
+            </button>
+            <button class="btn btn-blue" onclick="fetchDEA()" id="btn-dea">
+              📄 Scrape DEA (Preview Only)
+            </button>
+            <button class="btn btn-green" onclick="fetchDEASave()" id="btn-dea-save">
+              💾 Scrape DEA + Auto Save
+            </button>
+            <button class="btn btn-outline" onclick="loadFetchLog()">
+              🔄 Refresh Log
+            </button>
+          </div>
+          <div class="alert" id="fetch-result"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Auto-fetch log</div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Time</th><th>Type</th><th>Status</th><th>Message</th></tr></thead>
+            <tbody id="fetch-log-tbody"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- SYSTEM (super admin) -->
+      <div class="page" id="page-system">
+
+        <!-- Model Accuracy -->
+        <div class="card">
+          <div class="card-title">📊 Model Accuracy Metrics</div>
+          <p style="font-size:13px;color:var(--sub);margin-bottom:16px">
+            Performance metrics from the last training run. Lower MAE/RMSE and higher R² is better.
+          </p>
+          <div id="metrics-table-wrap">
+            <p style="color:var(--sub);font-size:13px">Loading metrics... (run retraining if this persists)</p>
+          </div>
+          <button class="btn btn-outline" onclick="loadModelMetrics()" style="margin-top:12px;font-size:13px;padding:6px 14px">🔄 Refresh Metrics</button>
+        </div>
+
+        <!-- Retrain -->
+        <div class="card">
+          <div class="card-title">🔄 Retrain ML Model</div>
+          <p style="font-size:13px;color:var(--sub);margin-bottom:16px">
+            After approving new price corrections, retrain the XGBoost model so predictions use the latest data. This takes 1–2 minutes.
+          </p>
+          <div id="retrain-status" class="alert"></div>
+          <button class="btn btn-green" onclick="retrainModel()" id="btn-retrain">
+            🔄 Start Retraining
+          </button>
+        </div>
+
+        <!-- API Health -->
+        <div class="card">
+          <div class="card-title">🩺 API Health</div>
+          <div id="health-status" style="font-size:14px;padding:12px 0;color:var(--sub)">Checking...</div>
+          <button class="btn btn-outline" onclick="checkHealth()" style="font-size:13px;padding:6px 14px">Refresh</button>
+        </div>
+
+        <!-- Chatbot Status -->
+        <div class="card">
+          <div class="card-title">🤖 AI Chatbot Status</div>
+          <p style="font-size:13px;color:var(--sub);margin-bottom:16px">
+            Checks whether the Gemini API key is configured on the server. Send a test message below to confirm it actually responds.
+          </p>
+          <div id="chatbot-status" style="font-size:14px;padding:12px 0;color:var(--sub)">Checking...</div>
+          <button class="btn btn-outline" onclick="checkChatbotStatus()" style="font-size:13px;padding:6px 14px;margin-bottom:18px">Refresh</button>
+
+          <div class="form-group" style="margin-bottom:12px">
+            <label for="chatbot-test-input">Test message</label>
+            <input type="text" id="chatbot-test-input" placeholder="e.g. How do I harvest cinnamon?">
+          </div>
+          <div class="alert" id="chatbot-test-result"></div>
+          <div class="btn-row">
+            <button class="btn btn-green" onclick="sendChatbotTest()" id="chatbot-test-btn">Send Test Message</button>
+          </div>
+
+          <!-- Testing convenience — resets today's usage count for the
+               web panel's test messages only (device_id "web-admin-panel"),
+               so testing here isn't blocked by the same daily fair-share
+               limit real farmers are subject to. Doesn't affect the limit
+               itself or any other device. -->
+          <div id="chatbot-reset-result" class="alert" style="margin-top:14px"></div>
+          <div class="btn-row">
+            <button class="btn btn-outline" onclick="resetChatbotQuota()" id="chatbot-reset-btn" style="font-size:13px">Reset web panel's daily chatbot quota</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="page" id="page-settings">
+        <div class="card" style="max-width:440px">
+          <div class="card-title">Change Password</div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label for="cp-old">Current password</label>
+            <input type="password" id="cp-old">
+          </div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label for="cp-new">New password</label>
+            <input type="password" id="cp-new">
+          </div>
+          <div class="alert alert-success" id="cp-ok"></div>
+          <div class="alert alert-error"   id="cp-err"></div>
+          <div class="btn-row">
+            <button class="btn btn-green" onclick="changePassword()">Change password</button>
+          </div>
+        </div>
+        <div class="card" style="max-width:440px;margin-top:0">
+          <div class="card-title">API Server URL</div>
+          <p style="font-size:13px;color:var(--sub);margin-bottom:12px">
+            Update this if your PC's IP address changes.
+          </p>
+          <div class="form-group" style="margin-bottom:12px">
+            <label for="api-url-input">Flask API URL</label>
+            <input type="text" id="api-url-input" placeholder="http://YOUR-PC-IP:5000">
+          </div>
+          <button class="btn btn-green" onclick="saveApiUrl()">Save URL</button>
+          <p style="font-size:12px;color:var(--sub);margin-top:8px" id="current-url"></p>
+        </div>
+      </div>
+
+    </div><!-- end content -->
+  </div><!-- end main -->
+</div><!-- end app-shell -->
+
+<!-- EDIT ROW MODAL -->
+<div class="modal-overlay" id="edit-modal" style="display:none">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title" id="edit-modal-title">Edit Price Row</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:14px" id="edit-modal-info"></div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="em-avg">Avg Price (Rs/kg) *</label>
+        <input type="number" id="em-avg" placeholder="6500">
+      </div>
+      <div class="form-group">
+        <label for="em-high">High Price (Rs/kg)</label>
+        <input type="number" id="em-high" placeholder="Optional">
+      </div>
+      <div class="form-group">
+        <label for="em-rain">Rainfall (mm)</label>
+        <input type="number" id="em-rain" placeholder="Leave blank = keep current">
+      </div>
+      <div class="form-group">
+        <label for="em-temp">Temp (°C)</label>
+        <input type="number" id="em-temp" placeholder="Leave blank = keep current">
+      </div>
+      <div class="form-group">
+        <label for="em-hum">Humidity (%)</label>
+        <input type="number" id="em-hum" placeholder="Leave blank = keep current">
+      </div>
+      <div class="form-group" id="em-reason-group">
+        <label for="em-reason">Reason *</label>
+        <input type="text" id="em-reason" placeholder="e.g. Incorrect price in bulletin">
+      </div>
+    </div>
+    <div class="alert" id="em-msg"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
+      <button class="btn btn-green" onclick="submitEditModal()" id="em-submit-btn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- REVIEW MODAL -->
+<div class="modal-overlay" id="review-modal">
+  <div class="modal">
+    <div class="modal-title" id="review-modal-title">Review Request</div>
+    <div id="review-modal-body"></div>
+    <div class="form-group" style="margin-top:14px" id="reject-note-group">
+      <label for="review-note">Rejection note (optional)</label>
+      <input type="text" id="review-note" placeholder="Reason for rejection">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-red"     onclick="confirmReview('reject')" id="btn-reject">Reject</button>
+      <button class="btn btn-green"   onclick="confirmReview('approve')" id="btn-approve">Approve</button>
+    </div>
+  </div>
+</div>
+<script>
+// ════════════════════════════════════════════════════
+// CONFIGURATION
+// ════════════════════════════════════════════════════
+// API URL: auto-detected when served from Flask (http://),
+// or from localStorage when opened as a file.
+let API = (function() {
+  // If served via Flask (not file://), use the same origin
+  if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+    const auto = window.location.protocol + '//' + window.location.host;
+    localStorage.setItem('cropAdminApiUrl', auto);
+    return auto;
+  }
+  // If opened as file://, use saved URL
+  return localStorage.getItem('cropAdminApiUrl') || '';
+})();
+let SESSION = null; // { username, role, fullName, district, crop }
+let META    = null; // { crops, districts_by_crop, grades_by_crop }
+let PENDING_COUNT = 0;
+let CURRENT_REVIEW_ID = null;
+let PRICE_DATA = []; // cached for export
+
+function getApi() { return localStorage.getItem('cropAdminApiUrl') || API; }
+
+async function apiFetch(path, options = {}) {
+  const res = await fetch(getApi() + path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  return res.json();
+}
+
+function showAlert(id, msg, type = 'success') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = `alert alert-${type} show`;
+  el.textContent = msg;
+  setTimeout(() => el.className = `alert alert-${type}`, 4000);
+}
+
+// ════════════════════════════════════════════════════
+// LOGIN / LOGOUT
+// ════════════════════════════════════════════════════
+function saveFirstRunUrl() {
+  const url = document.getElementById('first-run-url').value.trim();
+  if (!url.startsWith('http')) {
+    alert('URL must start with http:// — e.g. http://172.16.115.199:5000');
+    return;
+  }
+  localStorage.setItem('cropAdminApiUrl', url);
+  API = url;
+  document.getElementById('first-run-setup').style.display = 'none';
+  document.getElementById('api-url-input').value = url;
+  showAlert('login-error', '✅ API URL saved: ' + url, 'success');
+}
+
+function setApiUrl() {
+  const url = document.getElementById('login-api-url').value.trim();
+  if (!url.startsWith('http')) { 
+    alert('URL must start with http:// (e.g. http://172.16.115.199:5000)'); 
+    return; 
+  }
+  localStorage.setItem('cropAdminApiUrl', url);
+  API = url;
+  const disp = document.getElementById('current-api-display');
+  if (disp) { 
+    disp.textContent = 'Saved: ' + url;
+    disp.style.color = '#2E7D32';
+  }
+}
+
+async function doLogin() {
+  const u = document.getElementById('login-user').value.trim();
+  const p = document.getElementById('login-pass').value;
+  if (!u || !p) { showAlert('login-error','Enter username and password','error'); return; }
+  if (!getApi() || getApi() === '') {
+    const setup = document.getElementById('first-run-setup');
+    if (setup) setup.style.display = 'block';
+    showAlert('login-error','Please set the Flask API URL above first','error');
+    return;
+  }
+
+  document.getElementById('login-btn').disabled = true;
+  document.getElementById('login-btn').textContent = 'Logging in...';
+
+  try {
+    const res = await apiFetch('/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ username: u, password: p }),
+    });
+    if (res.success) {
+      SESSION = { username: res.username, role: res.role,
+                  fullName: res.full_name || res.username,
+                  district: res.district, crop: res.crop };
+      localStorage.setItem('cropAdminSession', JSON.stringify(SESSION));
+      await initApp();
+    } else {
+      showAlert('login-error', res.message || 'Invalid credentials', 'error');
+    }
+  } catch(e) {
+    showAlert('login-error', 'Cannot connect to server. Is Flask running?', 'error');
+  }
+  document.getElementById('login-btn').disabled = false;
+  document.getElementById('login-btn').textContent = 'Login';
+}
+
+function doLogout() {
+  SESSION = null;
+  META    = null;
+  localStorage.removeItem('cropAdminSession');
+  // Reload the page completely — this guarantees clean DOM state
+  // for the next user login regardless of who logged out
+  window.location.reload();
+}
+
+// ════════════════════════════════════════════════════
+// APP INIT
+// ════════════════════════════════════════════════════
+async function initApp() {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app-shell').style.display = 'block';
+
+  // User info
+  document.getElementById('user-info').innerHTML =
+    `👤 ${SESSION.fullName}<br>${SESSION.role === 'super_admin' ? '🔑 Super Admin' : '📋 DEA Staff'}`;
+
+  // Fetch metadata
+  META = await apiFetch('/metadata');
+
+  buildNav();
+  populateAllSelects();
+  // Small delay to let nav DOM settle before loading page content
+  await new Promise(r => setTimeout(r, 50));
+
+  // For DEA staff: pre-select their assigned crop/district in filter dropdowns
+  if (SESSION.role !== 'super_admin') {
+    if (SESSION.crop) {
+      const fCrop = document.getElementById('f-crop');
+      if (fCrop) fCrop.value = SESSION.crop;
+    }
+    if (SESSION.district) {
+      // filterCropChanged will populate districts — need to set after
+      // Store for use in showPage('prices')
+      window._staffDistrict = SESSION.district;
+    }
+  }
+
+  // Always start fresh after login — ignore any previous page state
+  if (SESSION.role === 'super_admin') {
+    await showPage('dashboard');
+  } else {
+    await showPage('prices');
+  }
+
+  if (SESSION.role === 'super_admin') {
+    // Delay pending count check so dashboard renders first
+    setTimeout(() => {
+      loadPendingCount();
+      setInterval(loadPendingCount, 300000);
+    }, 2000);
+  }
+
+  // API URL setting
+  document.getElementById('api-url-input').value = getApi();
+  document.getElementById('current-url').textContent = 'Current: ' + getApi();
+}
+
+// ════════════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════════════
+function buildNav() {
+  const isSuperAdmin = SESSION.role === 'super_admin';
+  const items = isSuperAdmin ? [
+    { id: 'dashboard',    label: 'Dashboard',       icon: '📊' },
+    { id: 'prices',       label: 'Price Table',      icon: '📋' },
+    { id: 'requests',     label: 'Pending Requests', icon: '⏳' },
+    { id: 'accounts',     label: 'Accounts',         icon: '👥' },
+    { id: 'reports',      label: 'Reports',           icon: '📑' },
+    { id: 'autofetch',    label: 'Auto Fetch',        icon: '☁' },
+    { id: 'system',       label: 'System',            icon: '⚙' },
+    { id: 'settings',     label: 'Settings',          icon: '🔧' },
+  ] : [
+    { id: 'prices',       label: 'Price Table',      icon: '📋' },
+    { id: 'my-requests',  label: 'My Requests',      icon: '📨' },
+    { id: 'reports',      label: 'Reports',           icon: '📑' },
+    { id: 'settings',     label: 'Settings',          icon: '🔧' },
+  ];
+
+  const nav = document.getElementById('nav');
+  nav.innerHTML = items.map(it => `
+    <div class="nav-item" id="nav-${it.id}" onclick="showPage('${it.id}')">
+      <span class="icon">${it.icon}</span> ${it.label}
+      ${it.id === 'requests' ? '<span id="nav-badge" class="badge" style="margin-left:auto;display:none">0</span>' : ''}
+    </div>
+  `).join('');
+
+  // Set staff/admin specific UI after a tick (elements may be hidden but exist)
+  setTimeout(() => {
+    const noteEl = document.getElementById('staff-correction-note');
+    const grpEl  = document.getElementById('s-notes-group');
+    if (SESSION.role !== 'super_admin') {
+      if (noteEl) noteEl.textContent = ' As DEA staff, your correction will be reviewed and approved by the super admin before saving.';
+    } else {
+      if (grpEl) grpEl.style.display = 'none';
+    }
+  }, 100);
+}
+
+async function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const page = document.getElementById('page-' + id);
+  const nav  = document.getElementById('nav-' + id);
+  if (page) page.classList.add('active');
+  if (nav)  nav.classList.add('active');
+
+  const titles = {
+    dashboard: 'Dashboard', prices: 'Price Table',
+    submit: 'Submit Correction',  // DEA staff only
+    requests: 'Pending Requests', 'my-requests': 'My Requests',
+    accounts: 'Accounts', reports: 'Reports',
+    autofetch: 'Auto Data Fetch', system: 'System', settings: 'Settings',
+  };
+  document.getElementById('page-title').textContent = titles[id] || id;
+
+  // Lazy load
+  if (id === 'prices') {
+    const fCropEl = document.getElementById('f-crop');
+    if (META?.crops?.length) {
+      const isSA = SESSION?.role === 'super_admin';
+      // Role-based crop list (DEA staff sees only their assigned crop)
+      const crops = isSA
+        ? META.crops
+        : (SESSION?.crop ? [SESSION.crop] : META.crops);
+      setOptions('f-crop', crops, v => v);
+      // Select correct crop
+      const targetCrop = (!isSA && SESSION?.crop) ? SESSION.crop : (fCropEl.value || crops[0]);
+      fCropEl.value = crops.includes(targetCrop) ? targetCrop : crops[0];
+      // Populate districts/grades for selected crop (role-filtered)
+      filterCropChanged();
+      await new Promise(r => setTimeout(r, 80));
+    }
+    // For DEA staff: apply their assigned district after filterCropChanged
+    if (SESSION?.role !== 'super_admin' && SESSION?.district) {
+      const dEl = document.getElementById('f-district');
+      if (dEl) {
+        const opts = [...dEl.options].map(o => o.value);
+        if (opts.includes(SESSION.district)) dEl.value = SESSION.district;
+        else if (dEl.options.length > 0) dEl.value = dEl.options[0].value;
+      }
+    }
+    // Always set default date range: 3 months back → today
+    const fromEl = document.getElementById('f-from');
+    const toEl   = document.getElementById('f-to');
+    if (fromEl) {
+      const d = new Date(); d.setMonth(d.getMonth() - 3);
+      fromEl.value = d.toISOString().split('T')[0];
+    }
+    if (toEl) {
+      toEl.value = new Date().toISOString().split('T')[0];
+    }
+    // Load table if all three dropdowns have values
+    const crop2     = document.getElementById('f-crop').value;
+    const district2 = document.getElementById('f-district').value;
+    const grade2    = document.getElementById('f-grade').value;
+    if (crop2 && district2 && grade2) {
+      loadPriceTable();
+    } else {
+      document.getElementById('price-tbody').innerHTML =
+        '<tr><td colspan="14" style="text-align:center;padding:20px;color:var(--sub)">Select crop, district and grade above</td></tr>';
+    }
+  } else if (id === 'system') {
+    checkHealth();
+    loadModelMetrics();
+    checkChatbotStatus();
+  } else if (id === 'requests')      { loadPendingRequests(); loadAllRequests(); }
+  else if (id === 'my-requests')     { loadMyRequests(); }
+  else if (id === 'accounts') {
+    loadAccounts();
+    // Ensure account form dropdowns are populated
+    if (META) {
+      const allD = [...new Set(Object.values(META.districts_by_crop || {}).flat())].sort();
+      const crops = (META.crops || []).sort();
+      setOptions('a-district', [''].concat(allD),  v => v || 'Select district');
+      setOptions('a-crop',     [''].concat(crops),  v => v || 'Select crop');
+    }
+  }
+  else if (id === 'autofetch')       {
+    loadFetchLog();
+    loadNextFetchInfo();
+    // Auto-refresh log every 5 minutes while viewing this page
+    clearInterval(window._fetchLogInterval);
+    window._fetchLogInterval = setInterval(() => {
+      if (document.getElementById('page-autofetch')?.style.display !== 'none') {
+        loadFetchLog();
+        loadNextFetchInfo();
+      }
+    }, 300000);
+  }
+  else if (id === 'dashboard')       { loadDashboard(); }
+  // Always reload dashboard stats
+}
+
+// ════════════════════════════════════════════════════
+// POPULATE SELECTS
+// ════════════════════════════════════════════════════
+function populateAllSelects() {
+  if (!META) return;
+  const isSuperAdmin = SESSION?.role === 'super_admin';
+
+  // For DEA staff: only show their assigned crop and district
+  const crops = isSuperAdmin
+    ? META.crops
+    : (SESSION?.crop ? [SESSION.crop] : META.crops);
+
+  const allDistricts = isSuperAdmin
+    ? [...new Set(Object.values(META.districts_by_crop).flat())]
+    : (SESSION?.district ? [SESSION.district] : [...new Set(Object.values(META.districts_by_crop).flat())]);
+
+  const allGrades = isSuperAdmin
+    ? [...new Set(Object.values(META.grades_by_crop).flat())]
+    : (SESSION?.crop && META.grades_by_crop[SESSION.crop]
+        ? META.grades_by_crop[SESSION.crop]
+        : [...new Set(Object.values(META.grades_by_crop).flat())]);
+
+  // Filter bar — DEA staff sees only their assigned crop/district
+  setOptions('f-crop',     crops,                          v => v);
+  setOptions('f-district', allDistricts,                   v => v);
+  setOptions('f-grade',    allGrades,                      v => v);
+
+  // Submit form
+  setOptions('s-crop', [''].concat(crops), v => v || 'Select crop');
+
+  // Report form (crop-aware)
+  const reportDistricts = isSuperAdmin
+    ? [...new Set(Object.values(META.districts_by_crop).flat())]
+    : allDistricts;
+  const reportGrades = isSuperAdmin
+    ? [...new Set(Object.values(META.grades_by_crop).flat())]
+    : allGrades;
+
+  setOptions('r-crop',     [''].concat(crops),           v => v || 'All crops');
+  setOptions('r-district', [''].concat(reportDistricts), v => v || 'All districts');
+  setOptions('r-grade',    [''].concat(reportGrades),    v => v || 'All grades');
+
+  // When report crop changes, update district/grade dropdowns
+  document.getElementById('r-crop').onchange = function() {
+    const c = this.value;
+    const d = (c && META?.districts_by_crop[c]) ? META.districts_by_crop[c] : reportDistricts;
+    const g = (c && META?.grades_by_crop[c])    ? META.grades_by_crop[c]    : reportGrades;
+    setOptions('r-district', [''].concat(d), v => v || 'All districts');
+    setOptions('r-grade',    [''].concat(g), v => v || 'All grades');
+  };
+
+  // Account form (super admin only)
+  if (isSuperAdmin) {
+    setOptions('a-district', [''].concat([...new Set(Object.values(META.districts_by_crop).flat())]), v => v || 'All districts');
+    setOptions('a-crop',     [''].concat(META.crops), v => v || 'All crops');
+  }
+}
+
+function setOptions(id, values, labelFn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = values.map(v =>
+    `<option value="${v}">${labelFn(v)}</option>`).join('');
+}
+
+function filterCropChanged() {
+  const crop = document.getElementById('f-crop').value;
+  const isSA = SESSION?.role === 'super_admin';
+
+  // Get districts for selected crop
+  let districts = (crop && META && META.districts_by_crop[crop])
+    ? META.districts_by_crop[crop]
+    : [...new Set(Object.values(META?.districts_by_crop || {}).flat())];
+
+  // DEA staff: only show their assigned district if valid for this crop
+  if (!isSA && SESSION?.district) {
+    districts = districts.includes(SESSION.district) ? [SESSION.district] : districts;
+  }
+
+  setOptions('f-district', districts, v => v);
+  const dEl = document.getElementById('f-district');
+  if (dEl && dEl.options.length > 0) dEl.value = dEl.options[0].value;
+
+  // Grades depend on BOTH crop and district — e.g. Cinnamon's M-5
+  // only exists for Matara, never Galle. Use the district that was
+  // JUST auto-selected above (districts[0]), not f-district's old
+  // DOM value, which is still stale from before this crop change.
+  const selDistrict = districts[0] || '';
+  const grades = (crop && selDistrict && META?.grades_by_crop_district?.[crop]?.[selDistrict])
+    || (crop && META && META.grades_by_crop[crop])
+    || [...new Set(Object.values(META?.grades_by_crop || {}).flat())];
+
+  setOptions('f-grade', grades, v => v);
+  const gEl = document.getElementById('f-grade');
+  if (gEl && gEl.options.length > 0) gEl.value = gEl.options[0].value;
+}
+
+// Keeps grades correct if the admin changes DISTRICT without changing
+// crop — without this, grades stayed stale from whichever district
+// was selected when the crop last changed.
+function filterDistrictChanged() {
+  const crop     = document.getElementById('f-crop').value;
+  const district = document.getElementById('f-district').value;
+  const grades = (crop && district && META?.grades_by_crop_district?.[crop]?.[district])
+    || (crop && META && META.grades_by_crop[crop])
+    || [...new Set(Object.values(META?.grades_by_crop || {}).flat())];
+  setOptions('f-grade', grades, v => v);
+  const gEl = document.getElementById('f-grade');
+  if (gEl && gEl.options.length > 0) gEl.value = gEl.options[0].value;
+}
+
+function submitCropChanged() {
+  const crop = document.getElementById('s-crop').value;
+  if (!crop || !META) return;
+  const districts = META.districts_by_crop[crop] || [];
+  setOptions('s-district', [''].concat(districts), v => v || 'Select district');
+  document.getElementById('s-district').value = '';
+  // Grades depend on BOTH crop and district (e.g. Cinnamon's M-5 only
+  // exists for Matara, never Galle) — district isn't picked yet here,
+  // so show the crop-wide list as a starting point; it narrows to the
+  // district-specific list in submitDistrictChanged() once district
+  // is actually chosen below.
+  const grades = META.grades_by_crop[crop] || [];
+  setOptions('s-grade', [''].concat(grades), v => v || 'Select grade');
+  document.getElementById('s-grade').value = '';
+}
+
+function submitDistrictChanged() {
+  const crop     = document.getElementById('s-crop').value;
+  const district = document.getElementById('s-district').value;
+  if (!crop || !district || !META) return;
+  const grades = META.grades_by_crop_district?.[crop]?.[district] || META.grades_by_crop[crop] || [];
+  setOptions('s-grade', [''].concat(grades), v => v || 'Select grade');
+  document.getElementById('s-grade').value = '';
+}
+
+function resetFilters() {
+  // Reset dates to 3-month default range
+  const fromEl = document.getElementById('f-from');
+  const toEl   = document.getElementById('f-to');
+  if (fromEl) {
+    const d = new Date(); d.setMonth(d.getMonth() - 3);
+    fromEl.value = d.toISOString().split('T')[0];
+  }
+  if (toEl) toEl.value = new Date().toISOString().split('T')[0];
+
+  const fCropEl = document.getElementById('f-crop');
+  if (!fCropEl || !META) return;
+
+  if (SESSION?.role === 'super_admin') {
+    // Super admin: reset to first available crop
+    setOptions('f-crop', META.crops, v => v);
+    fCropEl.value = META.crops[0] || '';
+  } else {
+    // DEA staff: reset to their assigned crop
+    const staffCrop = SESSION?.crop || META.crops[0] || '';
+    setOptions('f-crop', META.crops, v => v);
+    fCropEl.value = staffCrop;
+  }
+
+  // Populate districts/grades for selected crop
+  filterCropChanged();
+
+  // For DEA staff: apply their assigned district after filterCropChanged
+  if (SESSION?.role !== 'super_admin' && SESSION?.district) {
+    const dEl = document.getElementById('f-district');
+    if (dEl) {
+      const opts = [...dEl.options].map(o => o.value);
+      if (opts.includes(SESSION.district)) dEl.value = SESSION.district;
+    }
+  }
+
+  // Load table with reset values
+  const crop2     = document.getElementById('f-crop').value;
+  const district2 = document.getElementById('f-district').value;
+  const grade2    = document.getElementById('f-grade').value;
+  if (crop2 && district2 && grade2) loadPriceTable();
+}
+
+// ════════════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════════════
+async function loadDashboard() {
+  // Ensure META is loaded before rendering dashboard
+  if (!META) {
+    try { META = await apiFetch('/metadata'); } catch(e) { console.error('metadata failed', e); return; }
+  }
+  try {
+    const stats = document.getElementById('stats-grid');
+    const crops     = META?.crops?.length || 0;
+    const districts = [...new Set(Object.values(META?.districts_by_crop || {}).flat())].length;
+
+    // Load real model metrics (no hardcoded R2)
+    let r2Text = 'Loading...';
+    let maeText = '';
+    try {
+      const mx = await apiFetch('/admin/model-metrics');
+      if (mx.success && mx.models) {
+        const xgb = mx.models.find(m => m.model === 'XGBoost') || mx.models[0];
+        if (xgb) {
+          r2Text  = `R² = ${parseFloat(xgb.r2).toFixed(4)}`;
+          maeText = `MAE: Rs.${parseFloat(xgb.mae).toFixed(0)}/kg`;
+        }
+      }
+    } catch(e) { r2Text = 'Run retrain'; }
+
+    stats.innerHTML = `
+      <div class="stat-card green"><div class="label">Crops tracked</div><div class="value">${crops}</div><div class="sub">Cinnamon &amp; Pepper</div></div>
+      <div class="stat-card blue"><div class="label">Districts</div><div class="value">${districts}</div><div class="sub">Galle, Matara, Kandy, Matale</div></div>
+      <div class="stat-card orange"><div class="label">Pending requests</div><div class="value" id="dash-pending">${PENDING_COUNT}</div><div class="sub">Awaiting approval</div></div>
+      <div class="stat-card green"><div class="label">XGBoost Model</div><div class="value" style="font-size:15px">${r2Text}</div><div class="sub">${maeText}</div></div>
+    `;
+
+    // Background auto-fetch runs automatically every hour in Flask backend.
+    // No need to trigger from browser. Admin panel just reads the results.
+
+    // Populate the dashboard's own crop/district/grade selectors —
+    // defaults to the first available combo (same as before), but the
+    // admin can now change any of them instead of always seeing
+    // Cinnamon+Galle.
+    setOptions('dash-crop', META?.crops || [], v => v);
+    dashCropChanged(); // cascades district+grade, draws chart AND predictions
+  } catch(e) {
+    console.error('Dashboard load error:', e);
+  }
+}
+
+// Dashboard's own crop/district/grade selector — lets the admin view
+// the trend chart for ANY of the 4 crop/district combos, not just
+// whichever sorts first alphabetically (previously always Cinnamon+Galle).
+function dashCropChanged() {
+  const crop = document.getElementById('dash-crop').value;
+  const districts = (crop && META && META.districts_by_crop[crop])
+    ? META.districts_by_crop[crop]
+    : [];
+  setOptions('dash-district', districts, v => v);
+  const dEl = document.getElementById('dash-district');
+  if (dEl && dEl.options.length > 0) dEl.value = dEl.options[0].value;
+  dashDistrictChanged();
+}
+
+function dashDistrictChanged() {
+  const crop     = document.getElementById('dash-crop').value;
+  const district = document.getElementById('dash-district').value;
+  // Grades depend on BOTH crop and district — e.g. Cinnamon's M-5
+  // only exists for Matara, never Galle. grades_by_crop_district
+  // reflects that; grades_by_crop (crop-only) is kept only as a
+  // fallback in case an older /metadata response is ever served.
+  const grades = (crop && district && META?.grades_by_crop_district?.[crop]?.[district])
+    || (crop && META?.grades_by_crop?.[crop])
+    || [];
+  setOptions('dash-grade', grades, v => v);
+  const gEl = document.getElementById('dash-grade');
+  if (gEl && gEl.options.length > 0) gEl.value = gEl.options[0].value;
+  loadDashboardChart();
+}
+
+// Shows predictions for every grade available under the CURRENTLY
+// selected crop+district — replaces the old fixed "always these same
+// 4 combos" list, so this section stays in sync with the dropdowns
+// and chart above it instead of never changing.
+async function loadLatestPredictions() {
+  const predDiv = document.getElementById('latest-predictions');
+  if (!predDiv) return;
+  const crop     = document.getElementById('dash-crop')?.value;
+  const district = document.getElementById('dash-district')?.value;
+  if (!crop || !district) { predDiv.innerHTML = ''; return; }
+
+  const grades = (META?.grades_by_crop_district?.[crop]?.[district])
+    || (META?.grades_by_crop?.[crop])
+    || [];
+  if (grades.length === 0) {
+    predDiv.innerHTML = '<p style="color:var(--sub);font-size:13px">No grades available for this selection</p>';
+    return;
+  }
+
+  predDiv.innerHTML = '<p style="color:var(--sub);font-size:13px">Loading...</p>';
+
+  const preds = await Promise.allSettled(
+    grades.map(g => apiFetch('/predict', {
+      method: 'POST',
+      body: JSON.stringify({ district, crop, grade: g })
+    }))
+  );
+
+  predDiv.innerHTML = preds.map((p, i) => {
+    if (p.status !== 'fulfilled' || !p.value || !p.value.predicted_price) {
+      return '<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--sub)">Prediction unavailable for ' + (grades[i]||'') + '</div>';
+    }
+    const v = p.value;
+    const up = v.price_change_pct >= 0;
+    return `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);align-items:center">
+      <div>
+        <div style="font-weight:600;font-size:13px">${v.crop} ${v.grade} — ${v.district}</div>
+        <div style="font-size:11px;color:var(--sub)">Last known: Rs.${v.last_known_price?.toFixed(0)} (${v.last_known_date||'—'})</div>
+        <div style="font-size:11px;color:var(--sub)">Predicted for: ${v.predicted_for_date||'—'}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:700;color:var(--green);font-size:15px">Rs.${v.predicted_price?.toFixed(0)}</div>
+        <div style="font-size:12px;color:${up ? '#2E7D32' : '#C62828'}">${up ? '▲' : '▼'} ${Math.abs(v.price_change_pct)?.toFixed(2)}%</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadDashboardChart() {
+  const crop     = document.getElementById('dash-crop')?.value;
+  const district = document.getElementById('dash-district')?.value;
+  const grade    = document.getElementById('dash-grade')?.value;
+  // Keep "Latest predictions" in sync with the same selector that
+  // drives the chart — previously it was built once on page load
+  // from a fixed set of 4 combos and never updated when the
+  // dropdowns changed, while the chart updated correctly, which
+  // looked inconsistent/broken.
+  loadLatestPredictions();
+  if (!crop || !district || !grade) {
+    if (window._trendChart) { window._trendChart.destroy(); window._trendChart = null; }
+    return;
+  }
+  try {
+    const hist = await apiFetch(`/history?district=${encodeURIComponent(district)}&crop=${encodeURIComponent(crop)}&grade=${encodeURIComponent(grade)}&limit=16`);
+    if (!hist.data || hist.data.length === 0) {
+      if (window._trendChart) { window._trendChart.destroy(); window._trendChart = null; }
+      return;
+    }
+    // Sort by parsed date (DD.MM.YYYY) before plotting
+    const sorted = [...hist.data].sort((a, b) => {
+      const pa = a.date.split('.'); const pb = b.date.split('.');
+      const da = new Date(pa[2], pa[1]-1, pa[0]);
+      const db = new Date(pb[2], pb[1]-1, pb[0]);
+      return da - db;
+    });
+    const labels = sorted.map(r => r.date);
+    const prices = sorted.map(r => r.avg_price);
+    const ctx = document.getElementById('trend-chart').getContext('2d');
+    if (window._trendChart) window._trendChart.destroy();
+    window._trendChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: `${crop} ${grade} — ${district} (Rs/kg)`,
+          data: prices,
+          borderColor: '#2E7D32',
+          backgroundColor: 'rgba(46,125,50,0.08)',
+          fill: true, tension: 0.3, pointRadius: 3,
+        }],
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: true } },
+        scales: { y: { beginAtZero: false } },
+      },
+    });
+  } catch(e) {
+    console.error('Dashboard chart load error:', e);
+  }
+}
+
+// ════════════════════════════════════════════════════
+// PRICE TABLE
+// ════════════════════════════════════════════════════
+async function loadPriceTable() {
+  const crop     = document.getElementById('f-crop').value;
+  const district = document.getElementById('f-district').value;
+  const grade    = document.getElementById('f-grade').value;
+  const fromDate = document.getElementById('f-from').value;
+  const toDate   = document.getElementById('f-to').value;
+
+  if (!crop || !district || !grade) {
+    const tbodyCheck = document.getElementById('price-tbody');
+    if (tbodyCheck) tbodyCheck.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:20px;color:var(--sub)">Select a crop, district and grade to load data</td></tr>';
+    return;
+  }
+
+  const tbody = document.getElementById('price-tbody');
+  tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:20px;color:var(--sub)">Loading...</td></tr>';
+
+  try {
+    // No limit — load all rows for this crop/district/grade
+    const hist = await apiFetch(`/history?district=${encodeURIComponent(district)}&crop=${encodeURIComponent(crop)}&grade=${encodeURIComponent(grade)}`);
+    let data = hist.data || [];
+
+    if (fromDate) {
+      const from = new Date(fromDate);
+      data = data.filter(r => parseDate(r.date) >= from);
+    }
+    if (toDate) {
+      const to = new Date(toDate);
+      to.setHours(23,59,59,999);
+      data = data.filter(r => parseDate(r.date) <= to);
+    }
+
+    // Sort by parsed date then reverse for newest-first display
+    data = data.sort((a, b) => {
+      const pa = a.date.split('.'); const pb = b.date.split('.');
+      return new Date(pa[2], pa[1]-1, pa[0]) - new Date(pb[2], pb[1]-1, pb[0]);
+    }).reverse(); // newest first
+
+    PRICE_DATA = data;
+    document.getElementById('price-count').textContent = `(${data.length} rows)`;
+
+    function safeNum(v, dec=1) {
+      if (v === null || v === undefined || isNaN(v)) return '—';
+      return parseFloat(v).toFixed(dec);
+    }
+    function getSeasonHarvest(dateStr, cropName) {
+      if (!dateStr || !dateStr.includes('.')) return { season: '—', harvest: '—' };
+      const m = parseInt(dateStr.split('.')[1]);
+      const season = m >= 5 && m <= 9 ? 'Yala' : (m >= 10 || m <= 2 ? 'Maha' : 'Inter-Monsoon');
+      const harvestMonths = { Cinnamon: [5,6,7,8], Pepper: [1,2,3] };
+      const harvest = (harvestMonths[cropName] || []).includes(m) ? '✓' : '—';
+      return { season, harvest };
+    }
+
+    const isSA = SESSION?.role === 'super_admin';
+    tbody.innerHTML = data.map((r, i) => {
+      // After reverse(), data[0]=newest. Lag-1 = next index = older week.
+      const lag1 = (i + 1) < data.length ? data[i + 1].avg_price : null;
+      const ma4  = (i + 4) <= data.length
+        ? data.slice(i + 1, i + 5).reduce((s, x) => s + x.avg_price, 0) / 4
+        : null;
+      const { season, harvest } = getSeasonHarvest(r.date, crop);
+      const editBtn = isSA
+        ? `<button onclick="openEditModal('${r.date}','${crop}','${district}','${grade}',${r.avg_price||0},${r.high_price??'null'},${r.rainfall_mm??'null'},${r.temp_c??'null'},${r.humidity_pct??'null'})"
+             style="font-size:11px;padding:3px 10px;border:1px solid var(--green);border-radius:4px;background:white;cursor:pointer;color:var(--green)">✏ Edit</button>`
+        : `<button onclick="openRequestEdit('${r.date}','${crop}','${district}','${grade}',${r.avg_price||0},${r.high_price??'null'},${r.rainfall_mm??'null'},${r.temp_c??'null'},${r.humidity_pct??'null'})"
+             style="font-size:11px;padding:3px 10px;border:1px solid var(--blue);border-radius:4px;background:white;cursor:pointer;color:var(--blue)">⚑ Request Edit</button>`;
+      return `<tr>
+        <td>${r.date}</td>
+        <td>${crop}</td><td>${district}</td><td>${grade}</td>
+        <td style="font-weight:600">Rs. ${safeNum(r.avg_price, 0)}</td>
+        <td>${r.high_price != null ? 'Rs. ' + safeNum(r.high_price, 0) : '—'}</td>
+        <td>${safeNum(r.rainfall_mm)}</td>
+        <td>${safeNum(r.temp_c)}</td>
+        <td>${safeNum(r.humidity_pct)}</td>
+        <td>${lag1 != null ? 'Rs. ' + safeNum(lag1, 0) : '—'}</td>
+        <td>${ma4  != null ? 'Rs. ' + safeNum(ma4,  0) : '—'}</td>
+        <td style="color:${harvest==='✓'?'#2E7D32':'#999'}">${harvest}</td>
+        <td style="font-size:11px">${season}</td>
+        <td>${editBtn}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="14" style="text-align:center;padding:20px;color:var(--sub)">No data found</td></tr>';
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="14" style="color:red;padding:12px">Error: ${e.message}</td></tr>`;
+  }
+}
+
+// ════════════════════════════════════════════════════
+// EDIT ROW MODAL
+// ════════════════════════════════════════════════════
+let _editRow = {};
+
+function openEditModal(date, crop, district, grade, avg, high, rain, temp, hum) {
+  _editRow = { date, crop, district, grade };
+  document.getElementById('edit-modal-title').textContent =
+    SESSION?.role === 'super_admin' ? '✏ Edit Price Row' : '⚑ Request Edit';
+  document.getElementById('edit-modal-info').textContent =
+    `${crop} — ${district} — ${grade} — ${date}`;
+  document.getElementById('em-avg').value  = avg || '';
+  document.getElementById('em-high').value = (high && high !== 'null') ? high : '';
+  document.getElementById('em-rain').value = (rain && rain !== 'null') ? rain : '';
+  document.getElementById('em-temp').value = (temp && temp !== 'null') ? temp : '';
+  document.getElementById('em-hum').value  = (hum  && hum  !== 'null') ? hum  : '';
+  document.getElementById('em-reason').value = '';
+  const reasonGroup = document.getElementById('em-reason-group');
+  const submitBtn   = document.getElementById('em-submit-btn');
+  if (SESSION?.role === 'super_admin') {
+    reasonGroup.style.display = 'none';
+    submitBtn.textContent = 'Save Changes';
+  } else {
+    reasonGroup.style.display = '';
+    submitBtn.textContent = 'Submit Request';
+  }
+  document.getElementById('em-msg').className = 'alert';
+  document.getElementById('em-msg').textContent = '';
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function openRequestEdit(date, crop, district, grade, avg, high, rain, temp, hum) {
+  openEditModal(date, crop, district, grade, avg, high, rain, temp, hum);
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+}
+
+async function submitEditModal() {
+  const avg  = document.getElementById('em-avg').value;
+  const high = document.getElementById('em-high').value;
+  const rain = document.getElementById('em-rain').value;
+  const temp = document.getElementById('em-temp').value;
+  const hum  = document.getElementById('em-hum').value;
+  const reason = document.getElementById('em-reason').value;
+  const msgEl  = document.getElementById('em-msg');
+
+  if (!avg) { msgEl.className='alert alert-error show'; msgEl.textContent='Average price is required'; return; }
+  if (SESSION?.role !== 'super_admin' && !reason) {
+    msgEl.className='alert alert-error show'; msgEl.textContent='Reason is required'; return;
+  }
+
+  const btn = document.getElementById('em-submit-btn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  try {
+    let res;
+    if (SESSION?.role === 'super_admin') {
+      res = await apiFetch('/admin/edit-price', {
+        method: 'POST',
+        body: JSON.stringify({
+          requestor_username: SESSION.username,
+          date: _editRow.date, district: _editRow.district,
+          crop: _editRow.crop, grade: _editRow.grade,
+          avg_price: parseFloat(avg),
+          high_price:   high ? parseFloat(high) : null,
+          rainfall_mm:  rain ? parseFloat(rain) : null,
+          temp_c:       temp ? parseFloat(temp) : null,
+          humidity_pct: hum  ? parseFloat(hum)  : null,
+        })
+      });
+    } else {
+      res = await apiFetch('/admin/request-edit', {
+        method: 'POST',
+        body: JSON.stringify({
+          submitted_by: SESSION.username,
+          date: _editRow.date, district: _editRow.district,
+          crop: _editRow.crop, grade: _editRow.grade,
+          avg_price: parseFloat(avg),
+          high_price:   high ? parseFloat(high) : null,
+          rainfall_mm:  rain ? parseFloat(rain) : null,
+          temp_c:       temp ? parseFloat(temp) : null,
+          humidity_pct: hum  ? parseFloat(hum)  : null,
+          notes: reason,
+        })
+      });
+    }
+    if (res.success) {
+      msgEl.className = 'alert alert-success show';
+      msgEl.textContent = res.message || 'Done';
+      setTimeout(() => { closeEditModal(); loadPriceTable(); }, 1200);
+    } else {
+      msgEl.className = 'alert alert-error show';
+      msgEl.textContent = res.error || 'Failed';
+    }
+  } catch(e) {
+    msgEl.className = 'alert alert-error show';
+    msgEl.textContent = 'Error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = SESSION?.role === 'super_admin' ? 'Save Changes' : 'Submit Request';
+  }
+}
+
+function parseDate(str) {
+  if (!str) return new Date(0);
+  // Handle both DD.MM.YYYY and YYYY-MM-DD formats
+  if (str.includes('.')) {
+    const [d, m, y] = str.split('.');
+    return new Date(parseInt(y), parseInt(m)-1, parseInt(d));
+  }
+  return new Date(str); // YYYY-MM-DD
+}
+
+// ════════════════════════════════════════════════════
+// EXPORT
+// ════════════════════════════════════════════════════
+function exportExcel() {
+  if (!PRICE_DATA.length) { alert('Load data first'); return; }
+  const crop     = document.getElementById('f-crop').value;
+  const district = document.getElementById('f-district').value;
+  const grade    = document.getElementById('f-grade').value;
+
+  const header = ['Date','Crop','District','Grade','Avg Price (Rs)','High Price (Rs)','Rainfall (mm)','Temp (°C)','Humidity (%)'];
+  const rows   = PRICE_DATA.map(r => [
+    r.date, crop, district, grade,
+    r.avg_price?.toFixed(2) || '',
+    r.high_price?.toFixed(2) || '',
+    r.rainfall_mm?.toFixed(1) || '',
+    r.temp_c?.toFixed(1) || '',
+    r.humidity_pct?.toFixed(1) || '',
+  ]);
+
+  const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+  downloadFile(`crop_prices_${crop}_${district}_${grade}.csv`, csv, 'text/csv');
+}
+
+function exportPDF() {
+  if (!PRICE_DATA.length) { alert('Load data first'); return; }
+  const crop     = document.getElementById('f-crop').value;
+  const district = document.getElementById('f-district').value;
+  const grade    = document.getElementById('f-grade').value;
+
+  const rows = PRICE_DATA.map(r =>
+    `<tr><td>${r.date}</td><td>Rs.${r.avg_price?.toFixed(0)}</td><td>${r.high_price ? 'Rs.'+r.high_price.toFixed(0) : '—'}</td><td>${r.rainfall_mm?.toFixed(1)||'—'}</td><td>${r.temp_c?.toFixed(1)||'—'}</td><td>${r.humidity_pct?.toFixed(1)||'—'}</td></tr>`
+  ).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Price Report</title>
+  <style>body{font-family:Arial,sans-serif;padding:20px}h2{color:#2E7D32}table{width:100%;border-collapse:collapse;margin-top:16px;font-size:12px}th{background:#2E7D32;color:white;padding:8px}td{padding:6px 8px;border-bottom:1px solid #e0e0e0}tr:nth-child(even)td{background:#f9f9f9}</style>
+  </head><body>
+  <h2>Crop Price Report — ${crop} ${grade} — ${district}</h2>
+  <p>Generated: ${new Date().toLocaleString()}</p>
+  <table><thead><tr><th>Date</th><th>Avg Price</th><th>High Price</th><th>Rainfall</th><th>Temp</th><th>Humidity</th></tr></thead>
+  <tbody>${rows}</tbody></table>
+  </body></html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) {
+    // Popup blocked — download as HTML file instead
+    downloadFile(`crop_price_report_${crop}_${district}_${grade}.html`, html, 'text/html');
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+  // Give the new window 500ms to finish loading before opening print dialog
+  setTimeout(() => { win.focus(); win.print(); }, 500);
+}
+
+function downloadFile(name, content, type) {
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(new Blob([content], { type }));
+  a.download = name;
+  a.click();
+}
+
+// ════════════════════════════════════════════════════
+// SUBMIT PRICE
+// ════════════════════════════════════════════════════
+async function submitPrice() {
+  const date     = document.getElementById('s-date').value.trim();
+  const crop     = document.getElementById('s-crop').value;
+  const district = document.getElementById('s-district').value;
+  const grade    = document.getElementById('s-grade').value;
+  const avg      = document.getElementById('s-avg').value;
+
+  if (!date || !crop || !district || !grade || !avg) {
+    showAlert('submit-err', 'Date, crop, district, grade and average price are required', 'error');
+    return;
+  }
+  if (!/^\d{2}\.\d{2}\.\d{4}$/.test(date)) {
+    showAlert('submit-err', 'Date must be in DD.MM.YYYY format', 'error');
+    return;
+  }
+
+  const body = {
+    date, district, crop, grade, avg_price: parseFloat(avg),
+    high_price:   parseFloat(document.getElementById('s-high').value)    || null,
+    rainfall_mm:  parseFloat(document.getElementById('s-rain').value)    || null,
+    temp_c:       parseFloat(document.getElementById('s-temp').value)    || null,
+    humidity_pct: parseFloat(document.getElementById('s-humidity').value)|| null,
+  };
+
+  let endpoint, bodyData;
+  if (SESSION.role === 'super_admin') {
+    endpoint = '/admin/upload-price';
+    bodyData = body;
+  } else {
+    endpoint = '/admin/submit-price-request';
+    bodyData = { ...body, submitted_by: SESSION.username,
+                 notes: document.getElementById('s-notes').value };
+  }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  try {
+    const res = await apiFetch(endpoint, { method: 'POST', body: JSON.stringify(bodyData) });
+    if (res.success) {
+      showAlert('submit-ok', SESSION.role === 'super_admin'
+        ? `Price saved! ${res.weather_auto_fetched ? '(Weather auto-fetched from NASA)' : ''}`
+        : 'Request submitted for super admin approval.', 'success');
+      ['s-date','s-avg','s-high','s-rain','s-temp','s-humidity','s-notes'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+      });
+    } else {
+      showAlert('submit-err', res.error || 'Failed', 'error');
+    }
+  } catch(e) {
+    showAlert('submit-err', 'Error: ' + e.message, 'error');
+  }
+  btn.disabled = false; btn.textContent = 'Submit';
+}
+
+// ════════════════════════════════════════════════════
+// PENDING REQUESTS
+// ════════════════════════════════════════════════════
+async function loadPendingCount() {
+  try {
+    const res = await apiFetch('/admin/pending-requests', {
+      method: 'POST', body: JSON.stringify({ requestor_username: SESSION.username })
+    });
+    PENDING_COUNT = (res.requests || []).length;
+    const badge    = document.getElementById('pending-badge');
+    const navBadge = document.getElementById('nav-badge');
+    if (badge) { badge.textContent = PENDING_COUNT; badge.style.display = PENDING_COUNT > 0 ? '' : 'none'; }
+    if (navBadge) { navBadge.textContent = PENDING_COUNT; navBadge.style.display = PENDING_COUNT > 0 ? '' : 'none'; }
+    document.getElementById('dash-pending') && (document.getElementById('dash-pending').textContent = PENDING_COUNT);
+  } catch(_) {}
+}
+
+async function loadPendingRequests() {
+  const tbody = document.getElementById('req-tbody');
+  try {
+    const res = await apiFetch('/admin/pending-requests', {
+      method: 'POST', body: JSON.stringify({ requestor_username: SESSION.username })
+    });
+    const reqs = res.requests || [];
+    tbody.innerHTML = reqs.map(r => `
+      <tr>
+        <td>${r.id}</td>
+        <td><strong>${r.submitted_by}</strong></td>
+        <td>${r.date}</td>
+        <td>${r.crop}</td><td>${r.district}</td><td>${r.grade}</td>
+        <td>Rs.${r.avg_price?.toFixed(0)}</td>
+        <td style="font-size:11px">${r.rainfall_mm ? r.rainfall_mm.toFixed(1)+'mm' : '—'} ${r.temp_c ? r.temp_c.toFixed(1)+'°C' : ''} ${r.humidity_pct ? r.humidity_pct.toFixed(1)+'%' : ''}</td>
+        <td style="font-size:12px;color:var(--sub)">${r.notes || '—'}</td>
+        <td style="font-size:11px">${r.created_at?.slice(0,16)}</td>
+        <td>
+          <button class="btn btn-green" style="font-size:11px;padding:4px 10px" onclick="openReview(${r.id},'approve',\`${r.crop} ${r.grade} — ${r.district} — Rs.${r.avg_price?.toFixed(0)}\`)">✓ Approve</button>
+          <button class="btn btn-red"   style="font-size:11px;padding:4px 10px;margin-top:4px" onclick="openReview(${r.id},'reject',\`${r.crop} ${r.grade} — ${r.district}\`)">✗ Reject</button>
+        </td>
+      </tr>
+    `).join('') || '<tr><td colspan="11" style="text-align:center;color:var(--sub);padding:20px">No pending requests</td></tr>';
+    PENDING_COUNT = reqs.length;
+    loadPendingCount();
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="11" style="color:red">Error: ${e.message}</td></tr>`;
+  }
+}
+
+async function loadAllRequests() {
+  const tbody = document.getElementById('all-req-tbody');
+  try {
+    const res = await apiFetch('/admin/all-requests', {
+      method: 'POST', body: JSON.stringify({ requestor_username: SESSION.username })
+    });
+    const reqs = res.requests || [];
+    tbody.innerHTML = reqs.map(r => `
+      <tr>
+        <td>${r.id}</td><td>${r.submitted_by}</td>
+        <td>${r.crop}</td><td>${r.district}</td><td>${r.grade}</td><td>${r.date}</td>
+        <td>Rs.${r.avg_price?.toFixed(0)}</td>
+        <td><span class="pill pill-${r.status}">${r.status}</span></td>
+        <td>${r.reviewed_by || '—'}</td>
+        <td style="font-size:12px">${r.review_note || '—'}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--sub);padding:20px">No requests yet</td></tr>';
+  } catch(e) {}
+}
+
+let _pendingReviewAction = null;
+function openReview(id, action, label) {
+  CURRENT_REVIEW_ID    = id;
+  _pendingReviewAction = action;
+  document.getElementById('review-modal-title').textContent = (action === 'approve' ? 'Approve' : 'Reject') + ' Request';
+  document.getElementById('review-modal-body').innerHTML = `<p>${label}</p>`;
+  document.getElementById('reject-note-group').style.display = action === 'reject' ? 'block' : 'none';
+  document.getElementById('review-note').value = '';
+  document.getElementById('review-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('review-modal').classList.remove('open');
+}
+
+async function confirmReview(action) {
+  closeModal();
+  try {
+    const res = await apiFetch('/admin/review-request', {
+      method: 'POST',
+      body: JSON.stringify({
+        requestor_username: SESSION.username,
+        request_id: CURRENT_REVIEW_ID,
+        action,
+        review_note: document.getElementById('review-note').value,
+      })
+    });
+    showAlert('req-ok', res.message || 'Done', 'success');
+    loadPendingRequests();
+    loadAllRequests();
+  } catch(e) {
+    showAlert('req-err', 'Error: ' + e.message, 'error');
+  }
+}
+
+// ════════════════════════════════════════════════════
+// MY REQUESTS (DEA staff)
+// ════════════════════════════════════════════════════
+async function loadMyRequests() {
+  const tbody = document.getElementById('my-req-tbody');
+  try {
+    const res = await apiFetch('/admin/my-requests', {
+      method: 'POST', body: JSON.stringify({ username: SESSION.username })
+    });
+    const reqs = res.requests || [];
+    tbody.innerHTML = reqs.map(r => `
+      <tr>
+        <td>${r.id}</td><td>${r.date}</td>
+        <td>${r.crop}</td><td>${r.district}</td><td>${r.grade}</td>
+        <td>Rs.${r.avg_price?.toFixed(0)}</td>
+        <td><span class="pill pill-${r.status}">${r.status}</span></td>
+        <td style="font-size:12px">${r.review_note || '—'}</td>
+        <td style="font-size:11px">${r.created_at?.slice(0,16)}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--sub);padding:20px">No requests yet</td></tr>';
+  } catch(e) {}
+}
+
+// ════════════════════════════════════════════════════
+// ACCOUNTS
+// ════════════════════════════════════════════════════
+async function loadAccounts() {
+  const tbody = document.getElementById('accounts-tbody');
+  try {
+    const res = await apiFetch('/admin/list-accounts', {
+      method: 'POST', body: JSON.stringify({ requestor_username: SESSION.username })
+    });
+    const accs = res.accounts || [];
+    tbody.innerHTML = accs.map(a => `
+      <tr>
+        <td><strong>${a.username}</strong></td>
+        <td>${a.full_name || '—'}</td>
+        <td><span class="pill pill-${a.role === 'super_admin' ? 'super' : 'staff'}">${a.role}</span></td>
+        <td>${a.district || 'All'}</td>
+        <td>${a.crop || 'All'}</td>
+        <td>${a.email || '—'}</td>
+        <td style="font-size:11px">${a.created_at?.slice(0,10)}</td>
+        <td>${a.username !== SESSION.username ? `<button class="btn btn-red" style="font-size:11px;padding:3px 10px" onclick="deleteAccount('${a.username}')">Delete</button>` : '—'}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--sub)">No accounts</td></tr>';
+  } catch(e) {}
+}
+
+async function createAccount() {
+  const body = {
+    requestor_username: SESSION.username,
+    username:  document.getElementById('a-user').value.trim(),
+    password:  document.getElementById('a-pass').value,
+    role:      document.getElementById('a-role').value,
+    full_name: document.getElementById('a-name').value.trim(),
+    email:     document.getElementById('a-email').value.trim(),
+    district:  document.getElementById('a-district').value || null,
+    crop:      document.getElementById('a-crop').value || null,
+  };
+  if (!body.username || !body.password) {
+    showAlert('acc-err','Username and password are required','error'); return;
+  }
+  try {
+    const res = await apiFetch('/admin/create-account', { method:'POST', body:JSON.stringify(body) });
+    if (res.success) {
+      showAlert('acc-ok', res.message, 'success');
+      ['a-user','a-pass','a-name','a-email'].forEach(id => document.getElementById(id).value = '');
+      loadAccounts();
+    } else {
+      showAlert('acc-err', res.error || 'Failed', 'error');
+    }
+  } catch(e) {
+    showAlert('acc-err','Error: '+e.message,'error');
+  }
+}
+
+async function deleteAccount(username) {
+  if (!confirm(`Delete account: ${username}?`)) return;
+  try {
+    await apiFetch('/admin/delete-account', {
+      method:'POST', body:JSON.stringify({ requestor_username:SESSION.username, target_username:username })
+    });
+    loadAccounts();
+  } catch(e) {}
+}
+
+// ════════════════════════════════════════════════════
+// REPORTS
+// ════════════════════════════════════════════════════
+// Enumerates every VALID crop/district/grade combination matching
+// whichever filters are specific (non-empty) — "All crops" etc. means
+// walk every crop/district/grade META actually has data for, instead
+// of sending one combo with an empty value (which the backend correctly
+// rejects, since /predict and /history need one specific combination).
+function getReportCombos(crop, district, grade) {
+  const combos = [];
+  const crops = crop ? [crop] : (META.crops || []);
+  for (const c of crops) {
+    const validDistricts = META.districts_by_crop?.[c] || [];
+    const districts = district
+      ? (validDistricts.includes(district) ? [district] : [])
+      : validDistricts;
+    for (const d of districts) {
+      const validGrades = META.grades_by_crop_district?.[c]?.[d]
+        || META.grades_by_crop?.[c] || [];
+      const grades = grade
+        ? (validGrades.includes(grade) ? [grade] : [])
+        : validGrades;
+      for (const g of grades) combos.push({ crop: c, district: d, grade: g });
+    }
+  }
+  return combos;
+}
+
+async function generateReport(mode) {
+  const type     = document.getElementById('r-type').value;
+  const crop     = document.getElementById('r-crop').value;
+  const district = document.getElementById('r-district').value;
+  const grade    = document.getElementById('r-grade').value;
+  const fromDate = document.getElementById('r-from').value;
+  const toDate   = document.getElementById('r-to').value;
+
+  const combos = getReportCombos(crop, district, grade);
+  if (!combos.length) { alert('No matching crop/district/grade combinations found'); return; }
+
+  const results = await Promise.all(combos.map(async cb => {
+    const hist = await apiFetch(`/history?district=${encodeURIComponent(cb.district)}&crop=${encodeURIComponent(cb.crop)}&grade=${encodeURIComponent(cb.grade)}`);
+    let rows = hist.data || [];
+    if (fromDate) rows = rows.filter(r => parseDate(r.date) >= new Date(fromDate));
+    if (toDate)   rows = rows.filter(r => parseDate(r.date) <= new Date(toDate));
+    return { ...cb, rows };
+  }));
+
+  const nonEmpty = results.filter(r => r.rows.length > 0);
+  if (!nonEmpty.length) { alert('No data found for selected filters'); return; }
+
+  const multiCombo = combos.length > 1;
+  const title = multiCombo
+    ? `${type.replace(/_/g,' ').toUpperCase()} — ${crop || 'All Crops'} — ${district || 'All Districts'} — ${grade || 'All Grades'}`
+    : `${type.replace(/_/g,' ').toUpperCase()} — ${combos[0].crop} ${combos[0].grade} — ${combos[0].district}`;
+  document.getElementById('report-title').textContent = title;
+
+  const baseHeaders = {
+    price_summary:        ['Date','Avg Price (Rs)','High Price (Rs)','Change%','Rainfall (mm)','Temp (°C)','Humidity (%)'],
+    weekly_comparison:    ['Week','Date','Avg Price (Rs)','vs Previous Week','vs 4-week Avg'],
+    weather_impact:       ['Date','Avg Price (Rs)','Rainfall (mm)','Temp (°C)','Humidity (%)'],
+    prediction_accuracy:  ['Date','Actual Price (Rs)','Predicted','Difference'],
+  };
+  // When combining multiple combos, prepend identifying columns so
+  // each row is traceable — otherwise a combined table would be
+  // ambiguous about which crop/district/grade a row belongs to.
+  const headers = multiCombo ? ['Crop', 'District', 'Grade', ...baseHeaders[type]] : baseHeaders[type];
+
+  const getRowsFor = {
+    price_summary: (data) => data.map((r, i) => {
+      const prev = i > 0 ? data[i-1].avg_price : r.avg_price;
+      const chg  = prev ? ((r.avg_price - prev) / prev * 100).toFixed(2) : '0.00';
+      return [r.date, r.avg_price?.toFixed(0), r.high_price?.toFixed(0)||'—',
+              chg+'%', r.rainfall_mm?.toFixed(1)||'—', r.temp_c?.toFixed(1)||'—', r.humidity_pct?.toFixed(1)||'—'];
+    }),
+    weekly_comparison: (data) => data.map((r, i) => {
+      const prevWk = i > 0 ? data[i-1].avg_price : r.avg_price;
+      const ma4  = i >= 4 ? data.slice(i-4,i).reduce((s,x)=>s+x.avg_price,0)/4 : r.avg_price;
+      const vsP  = prevWk ? ((r.avg_price - prevWk)/prevWk*100).toFixed(2)+'%' : '0.00%';
+      const vsMa = ma4 ? ((r.avg_price - ma4)/ma4*100).toFixed(2)+'%' : '0.00%';
+      return [i+1, r.date, r.avg_price?.toFixed(0), vsP, vsMa];
+    }),
+    weather_impact: (data) => data.map(r =>
+      [r.date, r.avg_price?.toFixed(0), r.rainfall_mm?.toFixed(1)||'—',
+       r.temp_c?.toFixed(1)||'—', r.humidity_pct?.toFixed(1)||'—']),
+    prediction_accuracy: (data) => data.map((r, i) => {
+      const lag1  = i > 0 ? data[i-1].avg_price : r.avg_price;
+      const rough = lag1 * 1.001;
+      const diff  = (r.avg_price - rough).toFixed(0);
+      return [r.date, r.avg_price?.toFixed(0), rough.toFixed(0), diff];
+    }),
+  };
+
+  // IMPORTANT: week-over-week change, moving averages etc. must be
+  // computed WITHIN each combo's own time series BEFORE combining —
+  // comparing across different crops/districts would be meaningless
+  // (e.g. Pepper's "change" computed against Cinnamon's previous row).
+  let allRows = [];
+  let allPrices = [];
+  for (const combo of nonEmpty) {
+    const computed = getRowsFor[type] ? getRowsFor[type](combo.rows) : [];
+    const tagged = multiCombo
+      ? computed.map(row => [combo.crop, combo.district, combo.grade, ...row])
+      : computed;
+    allRows = allRows.concat(tagged);
+    allPrices = allPrices.concat(combo.rows.map(r => r.avg_price));
+  }
+
+  const thead = document.getElementById('report-thead');
+  const tbody = document.getElementById('report-tbody');
+  thead.innerHTML = headers.map(h => `<th>${h}</th>`).join('');
+  tbody.innerHTML = allRows.map(row => `<tr>${row.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('');
+
+  const avg = (allPrices.reduce((a,b)=>a+b,0)/allPrices.length).toFixed(0);
+  const min = Math.min(...allPrices).toFixed(0);
+  const max = Math.max(...allPrices).toFixed(0);
+  const filterDesc = `${crop||'All crops'} · ${district||'All districts'} · ${grade||'All grades'}`
+    + (fromDate || toDate ? ` · ${fromDate||'earliest'} to ${toDate||'latest'}` : '');
+  document.getElementById('report-summary').innerHTML =
+    `<div style="margin-bottom:6px"><strong>Filters:</strong> ${filterDesc}</div>
+     <div><strong>Summary:</strong> ${allRows.length} records across ${nonEmpty.length} combination(s) |
+     Avg: Rs.${avg} | Min: Rs.${min} | Max: Rs.${max} | Generated: ${new Date().toLocaleString()}</div>`;
+
+  document.getElementById('report-preview').style.display = 'block';
+
+  if (mode === 'excel') {
+    const metaLines = [
+      [title], [`Filters: ${filterDesc}`], [`Generated: ${new Date().toLocaleString()}`],
+      [`Records: ${allRows.length}  Avg: Rs.${avg}  Min: Rs.${min}  Max: Rs.${max}`], [],
+    ];
+    const csv = [...metaLines, headers, ...allRows].map(r => r.join(',')).join('\n');
+    downloadFile(`report_${type}_${crop||'all'}_${district||'all'}.csv`, csv, 'text/csv');
+  } else if (mode === 'pdf') {
+    const rowsHtml  = allRows.map(r => `<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('');
+    const theadHtml = headers.map(h=>`<th>${h}</th>`).join('');
+    const html = buildProfessionalReportHtml(title, filterDesc, allRows.length, avg, min, max, theadHtml, rowsHtml);
+    const win = window.open('', '_blank');
+    if (!win) {
+      downloadFile(`report_${type}_${crop||'all'}_${district||'all'}.html`, html, 'text/html');
+    } else {
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => { win.focus(); win.print(); }, 500);
+    }
+  }
+}
+
+// Professional, letterhead-style report — gradient header band,
+// summary stat boxes, zebra-striped table, print-friendly page setup.
+// Replaces the previous plain "h2 + table" output.
+function buildProfessionalReportHtml(title, filterDesc, count, avg, min, max, theadHtml, rowsHtml) {
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title>
+  <style>
+    @page { margin: 18mm 14mm; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a1a; margin: 0; position: relative; }
+
+    /* Watermark — diagonal, low-opacity, sits behind all content.
+       position:fixed makes most browsers' print engines repeat it on
+       every printed page automatically. */
+    .watermark {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none; z-index: -1;
+    }
+    .watermark span {
+      font-size: 64px; font-weight: 800; color: #1f5c3d; opacity: 0.06;
+      transform: rotate(-32deg); white-space: nowrap; letter-spacing: 4px;
+    }
+
+    .letterhead {
+      background: linear-gradient(135deg, #1f5c3d, #2E7D32);
+      color: #fff; padding: 20px 28px; border-radius: 0 0 12px 12px; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    .letterhead .logo-badge {
+      flex-shrink: 0; width: 52px; height: 52px; border-radius: 50%;
+      background: rgba(255,255,255,0.18); display: flex; align-items: center;
+      justify-content: center;
+    }
+    .letterhead .logo-text { flex: 1; }
+    .letterhead .brand { font-size: 12px; letter-spacing: 1.5px; opacity: .85; text-transform: uppercase; }
+    .letterhead h1 { margin: 6px 0 4px; font-size: 21px; font-weight: 700; }
+    .letterhead .sub { font-size: 12px; opacity: .9; }
+
+    /* Government logo placeholder — once you have the actual DEA /
+       government emblem as an image file, replace this <div> with:
+       <img src="data:image/png;base64,...(or a file path)"
+            style="width:52px;height:52px;object-fit:contain;">
+       Left as a clearly-labelled placeholder rather than an invented
+       or guessed graphic. */
+    .gov-logo-placeholder {
+      flex-shrink: 0; width: 52px; height: 52px; border-radius: 8px;
+      background: rgba(255,255,255,0.12); display: flex; align-items: center;
+      justify-content: center; font-size: 9px; text-align: center;
+      line-height: 1.2; opacity: 0.75; padding: 4px;
+    }
+
+    .meta-bar {
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+      background: #f4f7f5; border: 1px solid #e0e6e2; border-radius: 8px;
+      padding: 10px 16px; margin-bottom: 18px; font-size: 11.5px; color: #444;
+    }
+    .stat-row { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+    .stat-box { flex: 1; min-width: 100px; background: #fff; border: 1px solid #e5e5e5;
+      border-radius: 8px; padding: 10px 14px; text-align: center; }
+    .stat-box .label { font-size: 9.5px; color: #888; text-transform: uppercase; letter-spacing: .5px; }
+    .stat-box .value { font-size: 17px; font-weight: 700; color: #1f5c3d; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+    thead th { background: #1f5c3d; color: #fff; padding: 8px 10px; text-align: left;
+      font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .3px; }
+    tbody td { padding: 6px 10px; border-bottom: 1px solid #eee; }
+    tbody tr:nth-child(even) { background: #f8faf8; }
+    .footer { margin-top: 22px; padding-top: 10px; border-top: 1px solid #e0e0e0;
+      font-size: 9.5px; color: #707070; display: flex; justify-content: space-between; }
+    @media print {
+      .letterhead, thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .watermark span { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+  </head><body>
+    <div class="watermark"><span>CROP PRICE PREDICTOR</span></div>
+    <div class="letterhead">
+      <div class="logo-badge">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C7 2 3 6 3 11c0 5 4 9 9 11 5-2 9-6 9-11 0-5-4-9-9-9z" fill="#ffffff" opacity="0.9"/>
+          <path d="M12 6c-2.5 2-3.5 5-3.5 7.5S10 18 12 18s3.5-2 3.5-4.5S14.5 8 12 6z" fill="#2E7D32"/>
+        </svg>
+      </div>
+      <div class="logo-text">
+        <div class="brand">Crop Price Predictor — Cinnamon &amp; Pepper, Sri Lanka</div>
+        <h1>${title}</h1>
+        <div class="sub">${filterDesc}</div>
+      </div>
+      <div class="gov-logo-placeholder">DEA<br>Sri Lanka</div>
+    </div>
+    <div class="meta-bar">
+      <div>📄 Generated: ${new Date().toLocaleString()}</div>
+      <div>📊 ${count} records</div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-box"><div class="label">Records</div><div class="value">${count}</div></div>
+
+      <div class="stat-box"><div class="label">Average</div><div class="value">Rs.${avg}</div></div>
+      <div class="stat-box"><div class="label">Minimum</div><div class="value">Rs.${min}</div></div>
+      <div class="stat-box"><div class="label">Maximum</div><div class="value">Rs.${max}</div></div>
+    </div>
+    <table><thead><tr>${theadHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>
+    <div class="footer">
+      <span>Department of Export Agriculture (DEA) data — Sri Lanka</span>
+      <span>Generated by Crop Price Predictor admin panel</span>
+    </div>
+  </body></html>`;
+}
+
+// ════════════════════════════════════════════════════
+// AUTO FETCH
+// ════════════════════════════════════════════════════
+async function fetchWeather() {
+  const btn = document.getElementById('btn-weather');
+  btn.disabled = true; btn.textContent = 'Fetching...';
+  try {
+    const res = await apiFetch('/auto-fetch/weather', { method:'POST' });
+    const el  = document.getElementById('fetch-result');
+    el.className = 'alert alert-success show';
+    el.textContent = res.message || 'Weather fetched';
+    loadFetchLog();
+  } catch(e) {
+    el = document.getElementById('fetch-result');
+    el.className = 'alert alert-error show';
+    el.textContent = 'Error: ' + e.message;
+  }
+  btn.disabled = false; btn.textContent = '☁ Fetch NASA Weather';
+}
+
+async function fetchDEASave() {
+  const btn = document.getElementById('btn-dea-save');
+  btn.disabled = true; btn.textContent = 'Scraping & saving...';
+  try {
+    const res = await apiFetch('/auto-fetch/dea-save', {
+      method: 'POST',
+      body: JSON.stringify({
+        requestor_username: SESSION?.username || '',
+        auto_approve: true,
+      })
+    });
+    const el = document.getElementById('fetch-result');
+    el.className = `alert alert-${res.success ? 'success' : 'info'} show`;
+    el.textContent = `${res.message} | Saved: ${res.rows_saved || 0} rows (${res.save_mode || 'pending'})`;
+    loadFetchLog();
+    if (res.success) loadPriceTable();
+  } catch(e) {
+    el = document.getElementById('fetch-result');
+    el.className = 'alert alert-error show';
+    el.textContent = 'Error: ' + e.message;
+  }
+  btn.disabled = false; btn.textContent = '💾 Scrape DEA + Auto Save';
+}
+
+async function fetchDEA() {
+  const btn = document.getElementById('btn-dea');
+  btn.disabled = true; btn.textContent = 'Scraping...';
+  try {
+    const res = await apiFetch('/auto-fetch/dea-prices', { method:'POST' });
+    const el  = document.getElementById('fetch-result');
+    el.className = `alert alert-${res.success ? 'success' : 'info'} show`;
+    el.textContent = res.message + (res.rows_found ? ` (${res.rows_found} rows found)` : '');
+    loadFetchLog();
+  } catch(e) {
+    el = document.getElementById('fetch-result');
+    el.className = 'alert alert-error show';
+    el.textContent = 'Error: ' + e.message;
+  }
+  btn.disabled = false; btn.textContent = '📄 Scrape DEA Price PDF';
+}
+
+async function loadNextFetchInfo() {
+  const el = document.getElementById('next-fetch-content');
+  if (!el) return;
+  try {
+    const res = await apiFetch('/admin/next-fetch-info');
+    if (!res.success) { el.innerHTML = `<span style="color:red">${res.error}</span>`; return; }
+    const d = res.dea;
+    const n = res.nasa;
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px">
+        <div style="background:#f9f9f9;border-radius:8px;padding:14px;border:1px solid var(--border)">
+          <div style="font-weight:700;color:var(--green);margin-bottom:8px">📋 DEA Price Bulletin (exagri.info)</div>
+          <div style="margin-bottom:4px"><span style="color:var(--sub)">Latest bulletin:</span> <strong>${d.latest_bulletin || '—'}</strong></div>
+          <div style="margin-bottom:4px"><span style="color:var(--sub)">Next bulletin:</span> <strong style="color:#E65100">${d.next_bulletin || '—'}</strong></div>
+          <div style="margin-bottom:4px"><span style="color:var(--sub)">Last fetched:</span> ${d.last_fetched?.slice(0,16) || 'Never'}</div>
+          <div style="font-size:12px;color:var(--sub);margin-top:6px">${d.last_message || ''}</div>
+        </div>
+        <div style="background:#f9f9f9;border-radius:8px;padding:14px;border:1px solid var(--border)">
+          <div style="font-weight:700;color:var(--blue);margin-bottom:8px">🛰 NASA POWER Weather</div>
+          <div style="margin-bottom:4px"><span style="color:var(--sub)">Current month:</span> <strong>${n.current_month}</strong></div>
+          <div style="margin-bottom:4px"><span style="color:var(--sub)">Last fetched:</span> ${n.last_fetched?.slice(0,16) || 'Never'}</div>
+          <div style="margin-bottom:4px"><span style="color:var(--sub)">Rows missing weather:</span> <strong style="color:${n.missing_weather>0?'#C62828':'#2E7D32'}">${n.missing_weather}</strong></div>
+          <div style="font-size:12px;color:var(--sub);margin-top:6px">Backfills all historical months with missing weather data.</div>
+        </div>
+      </div>
+    `;
+  } catch(e) {
+    el.innerHTML = `<span style="color:red">Error: ${e.message}</span>`;
+  }
+}
+
+async function loadFetchLog() {
+  const tbody = document.getElementById('fetch-log-tbody');
+  try {
+    const res = await apiFetch('/auto-fetch/status');
+    const log = res.log || [];
+    const typeLabel = t =>
+      t === 'auto_fetch_all'  ? 'DEA + Weather (Auto)' :
+      t === 'nasa_weather'    ? 'NASA Weather' :
+      t === 'dea_scrape'      ? 'DEA Prices (Preview)' :
+      t === 'dea_scrape_save' ? 'DEA Prices (Saved)' : (t || '—');
+    tbody.innerHTML = log.map(r => `
+      <tr>
+        <td style="font-size:11px">${r.created_at?.slice(0,16) || '—'}</td>
+        <td style="font-size:12px;color:var(--blue)">${typeLabel(r.fetch_type)}</td>
+        <td><span class="badge" style="background:${r.status==='success'?'var(--green)':'var(--red)'}">${(r.status||'').toUpperCase()}</span></td>
+        <td style="font-size:12px">${r.message || '—'}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--sub)">No log entries</td></tr>';
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:red">Could not load log</td></tr>';
+  }
+}
+
+// ════════════════════════════════════════════════════
+// SYSTEM
+// ════════════════════════════════════════════════════
+async function checkHealth() {
+  const el = document.getElementById('health-status');
+  try {
+    const res = await apiFetch('/health');
+    el.innerHTML = `✅ <strong>API Online</strong> — Model: ${res.model} — ${res.timestamp?.slice(0,19)}`;
+    el.style.color = '#2E7D32';
+  } catch(e) {
+    el.innerHTML = '❌ <strong>API Offline</strong> — Flask server not reachable';
+    el.style.color = '#C62828';
+  }
+}
+
+async function checkChatbotStatus() {
+  const el = document.getElementById('chatbot-status');
+  el.textContent = 'Checking...';
+  el.style.color = 'var(--sub)';
+  try {
+    const res = await apiFetch('/admin/chatbot-status');
+    if (res.configured) {
+      el.innerHTML = `✅ <strong>Configured</strong> — model: ${res.model}`;
+      el.style.color = '#2E7D32';
+    } else {
+      el.innerHTML = '❌ <strong>Not configured</strong> — GEMINI_API_KEY is not set on the server';
+      el.style.color = '#C62828';
+    }
+  } catch(e) {
+    el.innerHTML = '❌ <strong>Could not check</strong> — server unreachable';
+    el.style.color = '#C62828';
+  }
+}
+
+async function sendChatbotTest() {
+  const input   = document.getElementById('chatbot-test-input');
+  const btn     = document.getElementById('chatbot-test-btn');
+  const result  = document.getElementById('chatbot-test-result');
+  const msg     = input.value.trim();
+  if (!msg) { alert('Enter a test message first'); return; }
+
+  btn.disabled = true; btn.textContent = 'Sending...';
+  result.className = 'alert alert-info show';
+  result.textContent = 'Waiting for response...';
+
+  try {
+    // A stable, dedicated device_id (not the default "unknown" bucket)
+    // so the reset button below always knows exactly what to clear —
+    // this is completely separate from any individual farmer's phone.
+    const res = await apiFetch('/chatbot', {
+      method: 'POST',
+      body: JSON.stringify({ message: msg, language: 'en', device_id: 'web-admin-panel' })
+    });
+    if (res.reply) {
+      result.className = 'alert alert-success show';
+      result.textContent = res.reply;
+    } else {
+      result.className = 'alert alert-error show';
+      result.textContent = res.error || 'No reply received';
+    }
+  } catch(e) {
+    result.className = 'alert alert-error show';
+    result.textContent = 'Error: ' + e.message;
+  }
+  btn.disabled = false; btn.textContent = 'Send Test Message';
+}
+
+// Resets the web panel's OWN chatbot quota (device_id "web-admin-panel")
+// for today only — a testing convenience so trying the chatbot here
+// isn't blocked by the same daily fair-share limit real farmers are
+// subject to. Requires super admin login (enforced server-side).
+async function resetChatbotQuota() {
+  const btn    = document.getElementById('chatbot-reset-btn');
+  const result = document.getElementById('chatbot-reset-result');
+
+  btn.disabled = true; btn.textContent = 'Resetting...';
+  result.className = 'alert alert-info show';
+  result.textContent = 'Working...';
+
+  try {
+    const res = await apiFetch('/admin/reset-chatbot-quota', {
+      method: 'POST',
+      body: JSON.stringify({
+        requestor_username: SESSION.username,
+        device_id: 'web-admin-panel'
+      })
+    });
+    if (res.success) {
+      result.className = 'alert alert-success show';
+      result.textContent = "Today's quota reset for the web panel.";
+    } else {
+      result.className = 'alert alert-error show';
+      result.textContent = res.error || 'Reset failed';
+    }
+  } catch(e) {
+    result.className = 'alert alert-error show';
+    result.textContent = 'Error: ' + e.message;
+  }
+  btn.disabled = false; btn.textContent = "Reset web panel's daily chatbot quota";
+}
+
+async function loadModelMetrics() {
+  const wrap = document.getElementById('metrics-table-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<p style="color:var(--sub);font-size:13px">Loading...</p>';
+  try {
+    const res = await apiFetch('/admin/model-metrics');
+    if (!res.success) {
+      wrap.innerHTML = `<p style="color:var(--sub);font-size:13px">${res.error}</p>`;
+      return;
+    }
+    const models = res.models || [];
+    wrap.innerHTML = `
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>Model</th><th>R² Score</th><th>MAE (Rs/kg)</th><th>RMSE (Rs/kg)</th><th>Interpretation</th>
+        </tr></thead>
+        <tbody>
+          ${models.map(m => {
+            const r2   = parseFloat(m.r2   || 0);
+            const mae  = parseFloat(m.mae  || 0);
+            const rmse = parseFloat(m.rmse || 0);
+            const isBest = m.model === 'XGBoost';
+            const interp = `Explains ${(r2*100).toFixed(1)}% of price variation. Avg error: Rs.${mae.toFixed(0)}/kg`;
+            return `<tr style="${isBest?'font-weight:600;background:#f1f8e9':''}">
+              <td>${m.model}${isBest?' ⭐':''}</td>
+              <td style="color:${r2>=0.85?'#2E7D32':r2>=0.7?'#E65100':'#C62828'}">${r2.toFixed(4)}</td>
+              <td>Rs. ${mae.toFixed(2)}</td>
+              <td>Rs. ${rmse.toFixed(2)}</td>
+              <td style="font-size:12px;color:var(--sub)">${interp}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table></div>
+    `;
+  } catch(e) {
+    wrap.innerHTML = `<p style="color:red;font-size:13px">Error: ${e.message}</p>`;
+  }
+}
+
+async function retrainModel() {
+  const btn = document.getElementById('btn-retrain');
+  const div = document.getElementById('retrain-status');
+  if (!confirm('Retrain the XGBoost model? This takes 1-2 minutes.')) return;
+  btn.disabled = true; btn.textContent = '⏳ Retraining...';
+  div.className = 'alert alert-info show';
+  div.textContent = 'Retraining in progress. Please wait 1-2 minutes...';
+  try {
+    const res = await apiFetch('/admin/retrain', { method:'POST' });
+    div.className = `alert alert-${res.success ? 'success' : 'error'} show`;
+    div.textContent = res.success ? 'Model retrained and reloaded successfully.' : ('Error: ' + res.error);
+  } catch(e) {
+    div.className = 'alert alert-error show';
+    div.textContent = 'Error: ' + e.message;
+  }
+  btn.disabled = false; btn.textContent = '🔄 Start Retraining';
+}
+
+// ════════════════════════════════════════════════════
+// SETTINGS
+// ════════════════════════════════════════════════════
+async function changePassword() {
+  const old_p = document.getElementById('cp-old').value;
+  const new_p = document.getElementById('cp-new').value;
+  if (!old_p || !new_p) { showAlert('cp-err','Both fields required','error'); return; }
+  if (new_p.length < 6)  { showAlert('cp-err','New password must be at least 6 characters','error'); return; }
+  try {
+    const res = await apiFetch('/admin/change-password', {
+      method:'POST', body:JSON.stringify({ username:SESSION.username, old_password:old_p, new_password:new_p })
+    });
+    if (res.success) {
+      showAlert('cp-ok','Password changed successfully','success');
+      document.getElementById('cp-old').value = '';
+      document.getElementById('cp-new').value = '';
+    } else {
+      showAlert('cp-err', res.error || 'Failed','error');
+    }
+  } catch(e) {
+    showAlert('cp-err','Error: '+e.message,'error');
+  }
+}
+
+function saveApiUrl() {
+  const url = document.getElementById('api-url-input').value.trim();
+  if (!url.startsWith('http')) { alert('URL must start with http://'); return; }
+  localStorage.setItem('cropAdminApiUrl', url);
+  API = url;
+  document.getElementById('current-url').textContent = 'Saved: ' + url;
+  alert('API URL updated. Please log in again.');
+  doLogout();
+}
+
+// ════════════════════════════════════════════════════
+// STARTUP
+// ════════════════════════════════════════════════════
+// Auto-detect API URL when served from Flask
+if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+  API = window.location.protocol + '//' + window.location.host;
+  localStorage.setItem('cropAdminApiUrl', API);
+}
+
+// Try to restore session from localStorage (survives page refresh)
+const savedSession = localStorage.getItem('cropAdminSession');
+if (savedSession && getApi()) {
+  try {
+    SESSION = JSON.parse(savedSession);
+    // Verify session is still valid by checking server health
+    fetch(getApi() + '/health').then(r => {
+      if (r.ok) {
+        initApp();  // Restore the session
+      } else {
+        showLoginPage();
+      }
+    }).catch(() => showLoginPage());
+  } catch {
+    showLoginPage();
+  }
+} else {
+  showLoginPage();
+}
+
+function showLoginPage() {
+  document.getElementById('login-page').style.display = 'flex';
+  document.getElementById('app-shell').style.display  = 'none';
+  // Show first-run setup if API URL not configured
+  if (!getApi()) {
+    const setup = document.getElementById('first-run-setup');
+    if (setup) setup.style.display = 'block';
+  }
+  // Server status check
+  setTimeout(async () => {
+    const statusEl = document.getElementById('server-status');
+    if (!statusEl || !getApi()) return;
+    try {
+      const r = await fetch(getApi() + '/health', { signal: AbortSignal.timeout(3000) });
+      statusEl.textContent = r.ok ? '⬤ Server online' : '⬤ Server error';
+      statusEl.style.color = r.ok ? '#2E7D32' : '#E65100';
+    } catch {
+      statusEl.textContent = '⬤ Server offline — start Flask first';
+      statusEl.style.color = '#C62828';
+    }
+  }, 300);
+}
+
+</script>
+</body>
+</html>

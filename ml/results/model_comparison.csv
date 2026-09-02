@@ -1,0 +1,4 @@
+Model,R2 Score,MAE (Rs/kg),RMSE (Rs/kg),R2 Std
+Linear Regression,0.9894,35.93,50.74,0.0
+XGBoost,0.8588,110.48,185.54,0.0013
+Random Forest,0.7255,211.15,258.76,0.0
