@@ -1187,10 +1187,28 @@ def _call_gemini_model(model, message, system_prompt):
         },
     }
     try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=20)
+        # FIX: timeout increased from 20s to 45s. Root cause of the
+        # mobile-app-only 502s: Sinhala-language responses genuinely
+        # need 3-5x more tokens than English for the same answer (see
+        # comment above), and newer Gemini models also spend hidden
+        # "thinking" tokens before writing the visible reply — a real
+        # Sinhala farming question can legitimately take longer than
+        # 20s to generate, while a short English "Hello" test message
+        # never approaches that ceiling. 45s gives genuine headroom
+        # without leaving a farmer waiting indefinitely on a request
+        # that's truly stuck.
+        resp = requests.post(url, json=payload, headers=headers, timeout=45)
     except requests.exceptions.Timeout:
+        # FIX: this branch previously returned silently with no log
+        # line at all — the exact reason a timeout only ever showed up
+        # as a bare "502" in the access log, with no diagnostic detail
+        # to explain why. Logging it here closes that blind spot.
+        print(f"  Gemini timeout on {model} (message length: {len(message)} chars)")
         return {'ok': False, 'rate_limited': False, 'error': 'timeout'}
     except Exception as e:
+        # FIX: same silent-failure gap as above, for any other
+        # request-level exception (connection reset, DNS failure, etc.).
+        print(f"  Gemini request exception on {model}: {e}")
         return {'ok': False, 'rate_limited': False, 'error': str(e)}
 
     if resp.status_code == 429:
@@ -1203,6 +1221,13 @@ def _call_gemini_model(model, message, system_prompt):
     result     = resp.json()
     candidates = result.get('candidates', [])
     if not candidates:
+        # FIX: also previously silent. A real, distinct possible cause
+        # worth being able to see in logs: Gemini's safety filters can
+        # return zero candidates for a 200 response if the input was
+        # flagged (e.g. certain pest/chemical-treatment wording), which
+        # a short "Hello" test would never trigger but a real farmer
+        # question conceivably could.
+        print(f"  Gemini returned no candidates ({model}): {result.get('promptFeedback', 'no feedback info')}")
         return {'ok': False, 'rate_limited': False, 'error': 'no candidates'}
 
     # Only use parts that are the actual visible answer — skip any part
@@ -1213,6 +1238,8 @@ def _call_gemini_model(model, message, system_prompt):
         p.get('text', '') for p in parts if not p.get('thought', False)
     ).strip()
     if not reply:
+        # FIX: also previously silent — same rationale as above.
+        print(f"  Gemini returned an empty reply ({model}): finish_reason={candidates[0].get('finishReason', 'unknown')}")
         return {'ok': False, 'rate_limited': False, 'error': 'empty reply'}
 
     return {'ok': True, 'reply': reply}
