@@ -1159,9 +1159,11 @@ def _call_gemini_model(model, message, system_prompt):
       {'ok': True, 'reply': '...'}                        on success
       {'ok': False, 'rate_limited': True}                  on 429
       {'ok': False, 'rate_limited': False, 'error': '...'} on any other failure
-    The caller decides whether to retry with a different model — only
-    worth doing when rate_limited=True (other errors wouldn't be fixed
-    by switching models).
+    A failure may also carry 'retryable': True when switching to the other
+    model could fix it (timeout, connection error, 5xx overload, 404 model
+    not available, safety block, empty reply). Key or request problems
+    (400/401/403) are not retryable because another model won't fix them.
+    The caller switches model when rate_limited OR retryable is set.
     """
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     # NOTE: newer Gemini "Auth key" format keys (starting with "AQ.")
@@ -1204,19 +1206,23 @@ def _call_gemini_model(model, message, system_prompt):
         # as a bare "502" in the access log, with no diagnostic detail
         # to explain why. Logging it here closes that blind spot.
         print(f"  Gemini timeout on {model} (message length: {len(message)} chars)")
-        return {'ok': False, 'rate_limited': False, 'error': 'timeout'}
+        return {'ok': False, 'rate_limited': False, 'retryable': True, 'error': 'timeout'}
     except Exception as e:
         # FIX: same silent-failure gap as above, for any other
         # request-level exception (connection reset, DNS failure, etc.).
         print(f"  Gemini request exception on {model}: {e}")
-        return {'ok': False, 'rate_limited': False, 'error': str(e)}
+        return {'ok': False, 'rate_limited': False, 'retryable': True, 'error': str(e)}
 
     if resp.status_code == 429:
         print(f"  Gemini quota hit on {model}: {resp.text[:200]}")
         return {'ok': False, 'rate_limited': True}
     if resp.status_code != 200:
         print(f"  Gemini API error {resp.status_code} ({model}): {resp.text[:300]}")
-        return {'ok': False, 'rate_limited': False, 'error': f'status {resp.status_code}'}
+        # 5xx (overloaded) and 404 (model not available) can be fixed by switching
+        # model; 400/401/403 (bad request or key) cannot.
+        return {'ok': False, 'rate_limited': False,
+                'retryable': resp.status_code >= 500 or resp.status_code == 404,
+                'error': f'status {resp.status_code}'}
 
     result     = resp.json()
     candidates = result.get('candidates', [])
@@ -1228,7 +1234,7 @@ def _call_gemini_model(model, message, system_prompt):
         # a short "Hello" test would never trigger but a real farmer
         # question conceivably could.
         print(f"  Gemini returned no candidates ({model}): {result.get('promptFeedback', 'no feedback info')}")
-        return {'ok': False, 'rate_limited': False, 'error': 'no candidates'}
+        return {'ok': False, 'rate_limited': False, 'retryable': True, 'error': 'no candidates'}
 
     # Only use parts that are the actual visible answer — skip any part
     # flagged as internal "thought" content, or fragments of the
@@ -1240,10 +1246,195 @@ def _call_gemini_model(model, message, system_prompt):
     if not reply:
         # FIX: also previously silent — same rationale as above.
         print(f"  Gemini returned an empty reply ({model}): finish_reason={candidates[0].get('finishReason', 'unknown')}")
-        return {'ok': False, 'rate_limited': False, 'error': 'empty reply'}
+        return {'ok': False, 'rate_limited': False, 'retryable': True, 'error': 'empty reply'}
 
     return {'ok': True, 'reply': reply}
 
+
+
+# ── Live price answers for the chatbot ───────────────────────────────
+# Price questions are answered directly from the SAME numbers the Prediction
+# screen shows (latest DEA bulletin price from the database, and the ML model's
+# next-week prediction from compute_features() + MODEL.predict(), exactly as
+# /predict does it). The list is built by code, so EVERY grade is shown, the
+# figures are exact, and no Gemini quota is used for these questions.
+import re as _re
+from decimal import Decimal as _Decimal, ROUND_HALF_UP as _ROUND_HALF_UP
+
+_PRICE_INTENT = _re.compile(
+    r"\b(price|prices|rate|rates|cost|mila|mil|forecast|predict|prediction|"
+    r"anawaki|anaweki|anawekiya|sell|selling)\b|මිල|මිළ|අනාවැකි|විකුණ",
+    _re.IGNORECASE)
+_CROP_WORDS = {
+    'Cinnamon': _re.compile(r"cinnamon|kurudu|kurundu|kuruda|කුරුඳු|කුරුදු", _re.IGNORECASE),
+    'Pepper':   _re.compile(r"pepper|gammiris|gammirisa|ගම්මිරිස්|ගම්මිරිස", _re.IGNORECASE),
+}
+_DISTRICT_WORDS = {
+    'Galle':  _re.compile(r"galle|gaalla|ගාල්ල", _re.IGNORECASE),
+    'Matara': _re.compile(r"matara|maathara|mathara|මාතර", _re.IGNORECASE),
+    'Kandy':  _re.compile(r"kandy|kandi|maha\s*nuwara|mahanuwara|මහනුවර", _re.IGNORECASE),
+    'Matale': _re.compile(r"matale|maathale|mathale|මාතලේ|මාතලෙ", _re.IGNORECASE),
+}
+# Typos and other Singlish spellings are caught by close-match on single words.
+_CROP_ALIASES     = {'Cinnamon': ['cinnamon', 'kurudu', 'kurundu', 'kuruda'], 'Pepper': ['pepper', 'gammiris', 'gammirisa']}
+_DISTRICT_ALIASES = {'Galle': ['galle', 'gaalla'], 'Matara': ['matara', 'maathara', 'mathara'],
+                     'Kandy': ['kandy', 'mahanuwara', 'mahanuwra'], 'Matale': ['matale', 'maathale', 'mathale']}
+import difflib as _difflib
+
+def _detect_names(message, regex_map, alias_map):
+    """Crop or district names in the message: exact spellings first, then close misspellings."""
+    found = [k for k, rx in regex_map.items() if rx.search(message or '')]
+    tokens = _re.findall(r"[A-Za-z]{4,}", message or '')
+    for key, aliases in alias_map.items():
+        if key in found:
+            continue
+        if any(_difflib.get_close_matches(t.lower(), aliases, n=1, cutoff=0.8) for t in tokens):
+            found.append(key)
+    return found
+_CROP_SI     = {'Cinnamon': 'කුරුඳු', 'Pepper': 'ගම්මිරිස්'}
+_DISTRICT_SI = {'Galle': 'ගාල්ල', 'Matara': 'මාතර', 'Kandy': 'මහනුවර', 'Matale': 'මාතලේ'}
+_SINGLISH_MARKERS = _re.compile(
+    r"\b(kurudu|kurundu|gammiris|mila|kohomada|kohomd|kiyada|wala|wla|dws|dawas|"
+    r"ilaga|anawaki|anaweki|anawekiya)\b", _re.IGNORECASE)
+
+def _round_half_up(x):
+    """Whole-rupee rounding that matches the app's toStringAsFixed(0)."""
+    return int(_Decimal(str(round(float(x), 2))).quantize(_Decimal('1'), rounding=_ROUND_HALF_UP))
+
+def _detect_grades(message, known_grades):
+    """Grades named in the message. Tolerates spacing and hyphens: GR-1, gr1, "gr 1", C-5 Sp, c5sp, h faq."""
+    found, rest = [], message or ''
+    for g in sorted(known_grades, key=lambda x: len(_re.sub(r'[^A-Za-z0-9]', '', x)), reverse=True):
+        chunks = [_re.escape(c) for c in _re.split(r'[\s-]+', g) if c]
+        pat = _re.compile(r"(?<![A-Za-z0-9])" + r"[\s-]*".join(chunks) + r"(?![A-Za-z0-9])", _re.IGNORECASE)
+        if pat.search(rest):
+            found.append(g)
+            rest = pat.sub(' ', rest)   # so "C-5 Sp" is not also read as "C-5"
+    return found
+
+def _collect_price_rows(message):
+    """Returns [] unless the message is a price question that can be answered from live data."""
+    if not _PRICE_INTENT.search(message or ''):
+        return []
+    want_crops     = _detect_names(message, _CROP_WORDS, _CROP_ALIASES)
+    want_districts = _detect_names(message, _DISTRICT_WORDS, _DISTRICT_ALIASES)
+    known_c = ENCODING_MAPS.get('crop', {}); known_d = ENCODING_MAPS.get('district', {}); known_g = ENCODING_MAPS.get('grade', {})
+    want_grades = _detect_grades(message, known_g)
+    print(f"  Chatbot price filter: crops={want_crops} districts={want_districts} grades={want_grades}")
+    try:
+        conn = get_db()
+        found = conn.execute("SELECT DISTINCT crop, district, grade FROM price_history").fetchall()
+        conn.close()
+    except Exception as e:
+        print(f"  Chatbot price answer: database error: {e}")
+        return []
+    combos = []
+    for r in found:
+        crop, district, grade = r[0], r[1], r[2]
+        if crop not in known_c or district not in known_d or grade not in known_g:
+            continue
+        if want_crops and crop not in want_crops:
+            continue
+        if want_districts and district not in want_districts:
+            continue
+        if want_grades and grade not in want_grades:
+            continue
+        combos.append((known_c[crop], known_d[district], known_g[grade], crop, district, grade))
+    combos.sort()
+    rows = []
+    for _, _, _, crop, district, grade in combos:
+        try:
+            fv, ctx, err = compute_features(district, crop, grade)
+            if err or fv is None:
+                continue
+            predicted = float(MODEL.predict(fv)[0])
+            last      = float(ctx['last_price'])
+        except Exception as e:
+            print(f"  Chatbot price answer: skipped {crop}/{district}/{grade}: {e}")
+            continue
+        rows.append({'crop': crop, 'district': district, 'grade': grade,
+                     'last': _round_half_up(last), 'pred': _round_half_up(predicted),
+                     'pct': ((predicted - last) / last * 100) if last else 0.0,
+                     'last_date': str(ctx['last_date']), 'next_date': str(ctx['next_date'])})
+    return rows
+
+def _price_reply_lang(message, language):
+    """Sinhala when the app is in Sinhala, or the farmer typed Sinhala script or Singlish."""
+    if language == 'si' or _re.search(r'[඀-෿]', message or '') or _SINGLISH_MARKERS.search(message or ''):
+        return 'si'
+    return 'en'
+
+def _price_reply_text(rows, lang):
+    si = (lang == 'si')
+    out = []
+    for crop in dict.fromkeys(r['crop'] for r in rows):
+        crop_rows = [r for r in rows if r['crop'] == crop]
+        dates = {r['last_date'] for r in crop_rows}
+        one_date = len(dates) == 1
+        d0 = next(iter(dates))
+        if si:
+            out.append(f"{_CROP_SI.get(crop, crop)} මිල" + (f" (DEA බුලටින් {d0} අනුව)" if one_date else "")
+                       + " සහ ඊළඟ සතියේ අනාවැකිය:")
+        else:
+            out.append(f"{crop} prices" + (f" (latest DEA bulletin {d0})" if one_date else "")
+                       + " and the model's prediction for next week:")
+        for district in dict.fromkeys(r['district'] for r in crop_rows):
+            out.append('')
+            out.append(_DISTRICT_SI.get(district, district) if si else district)
+            for r in [x for x in crop_rows if x['district'] == district]:
+                tail = '' if one_date else f" [{r['last_date']}]"
+                if si:
+                    out.append(f"• {r['grade']}: අවසන් මිල රු. {r['last']}/කි.ග්‍රෑ. → ඊළඟ සතිය රු. {r['pred']}/කි.ග්‍රෑ. ({r['pct']:+.1f}%){tail}")
+                else:
+                    out.append(f"• {r['grade']}: latest Rs. {r['last']}/kg → next week Rs. {r['pred']}/kg ({r['pct']:+.1f}%){tail}")
+        out.append('')
+    out.append("ඊළඟ සතියේ මිල අනාවැකි මාදිලියකින් ලබාගත් අගයකි, සහතිකයක් නොවේ." if si
+               else "The next-week figure is a model prediction, not a guarantee.")
+    return '\n'.join(out).strip()
+
+# ── DEA contact answers for the chatbot ──────────────────────────────
+# Requests to contact a DEA officer or office are answered from this verified list
+# (taken from the official dea.gov.lk contact pages: office addresses and office
+# numbers only), never by the AI model, which could invent a phone number.
+_DEA_OFFICES = [
+    {'key': 'Head', 'en': 'DEA Head Office (Peradeniya)', 'si': 'DEA ප්‍රධාන කාර්යාලය (පේරාදෙණිය)',
+     'address': '#1095, Sirimavo Bandaranayake Mawatha, Getambe, Peradeniya',
+     'phones': ['081 238 8651', '081 238 6018', '081 238 6019'], 'email': 'helpdesk@dea.gov.lk'},
+    {'key': 'Galle', 'en': 'DEA Galle District Office', 'si': 'DEA ගාල්ල කාර්යාලය',
+     'address': 'Bandi Road, Labuduwa, Akmeemana, Galle', 'phones': ['091 222 3494'], 'email': 'deagalle2018@gmail.com'},
+    {'key': 'Matara', 'en': 'DEA Matara District Office', 'si': 'DEA මාතර කාර්යාලය',
+     'address': 'No 38, Rahula Road, Matara', 'phones': ['041 222 2443'], 'email': 'deamatara2018@gmail.com'},
+    {'key': 'Kandy', 'en': 'DEA Kandy District Office', 'si': 'DEA මහනුවර කාර්යාලය',
+     'address': 'No 1062, Sirimavo Bandaranayake Mawatha, Peradeniya', 'phones': ['081 238 8392'], 'email': 'deakandy2018@gmail.com'},
+    {'key': 'Matale', 'en': 'DEA Matale District Office', 'si': 'DEA මාතලේ කාර්යාලය',
+     'address': 'Elwala, Ukuwela, Matale', 'phones': ['066 224 3451'], 'email': 'deamatale2018@gmail.com'},
+]
+_CONTACT_SUBJECT = _re.compile(
+    r"\bdea\b|export\s*agri|officers?\b|\boffice\b|nildhari|nilathari|karyalay|නිලධාරි|කාර්යාල", _re.IGNORECASE)
+_CONTACT_ACTION = _re.compile(
+    r"contact|\bcall\b|phone|telephone|\btel\b|address|reach|\btalk\b|speak|katha|\bkata\b|krgan|karagan|"
+    r"hamuw|samband|සම්බන්ධ|අමතන්න|දුරකථන|කතා", _re.IGNORECASE)
+
+def _build_contact_reply(message, language):
+    """Verified DEA office list when the farmer asks to contact a DEA officer or office, else ''."""
+    msg = message or ''
+    if not (_CONTACT_SUBJECT.search(msg) and _CONTACT_ACTION.search(msg)):
+        return ''
+    si = (_price_reply_lang(msg, language) == 'si')
+    named = _detect_names(msg, _DISTRICT_WORDS, _DISTRICT_ALIASES)
+    offices = [o for o in _DEA_OFFICES if o['key'] in named] or [o for o in _DEA_OFFICES if o['key'] != 'Head']
+    offices = offices + [o for o in _DEA_OFFICES if o['key'] == 'Head']
+    out = ["අපනයන කෘෂිකර්ම දෙපාර්තමේන්තුව (DEA) අමතන්න පුළුවන්:" if si else "You can contact the Department of Export Agriculture (DEA):"]
+    for o in offices:
+        out.append('')
+        out.append(o['si'] if si else o['en'])
+        out.append(o['address'])
+        out.append(('දුරකථන: ' if si else 'Tel: ') + ', '.join(o['phones']))
+        out.append(o['email'])
+    out.append('')
+    out.append("කාර්යාල වේලාවන්හිදී (සඳුදා - සිකුරාදා) අමතන්න. ඇමතීමට දුරකථන අංකය ඔබන්න." if si
+               else "Please call during office hours (Monday to Friday). Tap a phone number to call.")
+    return '\n'.join(out)
 
 @app.route('/chatbot', methods=['POST'])
 def chatbot():
@@ -1256,6 +1447,21 @@ def chatbot():
     device_id = (data.get('device_id') or 'unknown').strip()
     if not message:
         return jsonify({'error': 'message is required'}), 400
+
+    # Requests to contact a DEA officer or office get the verified DEA contact list.
+    contact_reply = _build_contact_reply(message, language)
+    if contact_reply:
+        return jsonify({'reply': contact_reply, 'source': 'dea_directory'})
+
+    # Price questions are answered directly from live data (all grades, exact
+    # numbers, same as the Prediction screen). No Gemini call, so they neither
+    # use the shared quota nor count towards the per-device daily limit.
+    _t0 = datetime.now()
+    _price_rows = _collect_price_rows(message)
+    if _price_rows:
+        print(f"  Chatbot price answer: {len(_price_rows)} grades in {(datetime.now() - _t0).total_seconds():.2f}s")
+        return jsonify({'reply': _price_reply_text(_price_rows, _price_reply_lang(message, language)),
+                        'source': 'live_prices'})
 
     # Fair-share check FIRST, before spending any of the shared Gemini
     # quota — a device that's already used its daily allowance gets
@@ -1326,8 +1532,12 @@ def chatbot():
     # ~520/day capacity work transparently, without the farmer ever
     # needing to know or care which model actually answered.
     result = _call_gemini_model(GEMINI_MODEL, message, system_prompt)
-    if not result['ok'] and result.get('rate_limited'):
-        print(f"  {GEMINI_MODEL} quota exhausted — falling back to {GEMINI_FALLBACK_MODEL}")
+    if not result['ok'] and (result.get('rate_limited') or result.get('retryable')):
+        # Switch model on quota exhaustion (429) and also on failures a
+        # different model can fix: timeout, connection error, 5xx, 404,
+        # safety block or empty reply.
+        reason = 'quota exhausted' if result.get('rate_limited') else result.get('error', 'failed')
+        print(f"  {GEMINI_MODEL} {reason} — falling back to {GEMINI_FALLBACK_MODEL}")
         result = _call_gemini_model(GEMINI_FALLBACK_MODEL, message, system_prompt)
 
     if not result['ok']:
