@@ -5,6 +5,8 @@
 // inside this app — so it can't be extracted from the APK.
 // ============================================================
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/api_service.dart';
 import '../../services/language_service.dart';
 
@@ -49,6 +51,51 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     }
   }
 
+  // DEA contact details are sent by the backend as a normal chat reply when the
+  // farmer asks to contact a DEA officer (English or Sinhala). Phone numbers in
+  // a reply such as "081 238 8651" are shown as tappable links that open the dialer.
+  static final RegExp _phonePattern = RegExp(r'\b0\d{2} \d{3} \d{4}\b');
+
+  Future<void> _callNumber(String number) async {
+    var ok = false;
+    try {
+      ok = await launchUrl(Uri(scheme: 'tel', path: number));
+    } catch (_) {}
+    if (!ok) {
+      await Clipboard.setData(ClipboardData(text: number));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(_si ? 'අංකය පිටපත් කළා: $number' : 'Number copied: $number')));
+      }
+    }
+  }
+
+  Widget _messageText(_ChatMessage m) {
+    final style = TextStyle(color: m.isUser ? Colors.white : Colors.black87);
+    if (m.isUser) return Text(m.text, style: style);
+    final matches = _phonePattern.allMatches(m.text).toList();
+    if (matches.isEmpty) return Text(m.text, style: style);
+    final spans = <InlineSpan>[];
+    var last = 0;
+    for (final x in matches) {
+      if (x.start > last) spans.add(TextSpan(text: m.text.substring(last, x.start)));
+      final shown = x.group(0)!;
+      spans.add(WidgetSpan(
+        alignment: PlaceholderAlignment.baseline,
+        baseline: TextBaseline.alphabetic,
+        child: GestureDetector(
+          onTap: () => _callNumber(shown.replaceAll(' ', '')),
+          child: Text(shown,
+              style: style.copyWith(
+                  color: Colors.blue[800], decoration: TextDecoration.underline)),
+        ),
+      ));
+      last = x.end;
+    }
+    if (last < m.text.length) spans.add(TextSpan(text: m.text.substring(last)));
+    return Text.rich(TextSpan(style: style, children: spans));
+  }
+
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _sending) return;
@@ -80,8 +127,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       setState(() => _messages.add(_ChatMessage(
           text: looksTechnical
               ? (_si
-                  ? 'සමාවන්න, දැන් උත්තර දෙන්න බැහැ. නැවත උත්සාහ කරන්න.'
-                  : "Sorry, I couldn't answer that right now. Please try again.")
+                  ? 'සමාවන්න, දැන් උත්තර දෙන්න බැහැ. නැවත උත්සාහ කරන්න. DEA නිලධාරියෙකු අමතන්න ඕනේ නම්, "DEA නිලධාරියෙකු අමතන්න" කියා ටයිප් කරන්න.'
+                  : "Sorry, I couldn't answer that right now. Please try again. To reach a DEA officer, type: contact DEA officer.")
               : raw,
           isUser: false)));
     } finally {
@@ -126,36 +173,25 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
               itemBuilder: (ctx, i) {
                 if (i == _messages.length) {
                   // Typing indicator while waiting for a reply
-                  return Semantics(
-                    label: _si ? 'AI සහායක ටයිප් කරමින්' : 'AI assistant is typing',
-                    liveRegion: true,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const SizedBox(
-                          width: 16, height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const SizedBox(
+                        width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                     ),
                   );
                 }
                 final m = _messages[i];
-                // Screen readers can't rely on alignment/colour (the
-                // only cue sighted users get) to tell a user message
-                // from an AI reply, so the sender is announced
-                // explicitly here.
-                return Semantics(
-                  label: (m.isUser ? (_si ? 'ඔබ' : 'You') : (_si ? 'AI සහායක' : 'AI assistant'))
-                      + ': ${m.text}',
-                  child: Align(
+                return Align(
                   alignment: m.isUser ? Alignment.centerRight : Alignment.centerLeft,
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 12),
@@ -169,12 +205,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                           : Colors.grey[200],
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Text(
-                      m.text,
-                      style: TextStyle(
-                          color: m.isUser ? Colors.white : Colors.black87),
-                    ),
-                  ),
+                    child: _messageText(m),
                   ),
                 );
               },
@@ -211,8 +242,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                     color: theme.colorScheme.primary,
                     shape: const CircleBorder(),
                     child: IconButton(
-                      icon: const Icon(Icons.send, color: Colors.white),
+                      // The tooltip is the spoken label for TalkBack and the
+                      // handle the widget tests use to find this button.
                       tooltip: _si ? 'යවන්න' : 'Send',
+                      icon: const Icon(Icons.send, color: Colors.white),
                       onPressed: _sending ? null : _send,
                     ),
                   ),

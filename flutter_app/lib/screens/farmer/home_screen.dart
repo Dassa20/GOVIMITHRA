@@ -11,6 +11,7 @@ import '../../services/auth_service.dart';
 import '../../services/language_service.dart';
 import '../../services/weather_service.dart';
 import '../../utils/crop_labels.dart';
+import '../../utils/dea_contact_sheet.dart';
 import '../../models/app_models.dart';
 import 'prediction_screen.dart';
 import 'chatbot_screen.dart';
@@ -119,10 +120,11 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       setState(() {
         _loading = false;
+        // Farmer-friendly wording: no technical terms, and it says what to do next.
         _error   = _si
-            ? 'සර්වරයට සම්බන්ධ විය නොහැක.\nFlask API ක්‍රියාත්මකද යන්න පරීක්ෂා කරන්න.'
-            : 'Could not connect to server.\n'
-              'Make sure your Flask API is running.';
+            ? 'සමාවන්න, මිල තොරතුරු දැන් ලබාගත නොහැක.\nඔබේ අන්තර්ජාල සම්බන්ධතාවය පරීක්ෂා කර මද වේලාවකින් නැවත උත්සාහ කරන්න.'
+            : 'Could not connect to the price service right now.\n'
+              'Please check your internet connection and try again in a moment.';
       });
     }
   }
@@ -792,10 +794,71 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
+
+                // Help card — a one-tap way to call the DEA office for the
+                // farmer's district (also reachable from the AI Help chat).
+                const SizedBox(height: 28),
+                _contactDeaCard(theme),
+                // Keeps the card clear of the floating "AI Help" button.
+                const SizedBox(height: 72),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _contactDeaCard(ThemeData theme) {
+    final title = _si ? 'උදව් අවශ්‍යද? DEA ට අමතන්න' : 'Need help? Call DEA';
+    final subtitle = _si
+        ? 'ඔබේ දිස්ත්‍රික්කයේ අපනයන කෘෂිකර්ම දෙපාර්තමේන්තු කාර්යාලය'
+        : 'Department of Export Agriculture office for your district';
+    return Semantics(
+      button: true,
+      label: '$title. $subtitle',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => showDeaContactSheet(context,
+            si: _si, preferredDistrict: _selectedDistrict),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.support_agent,
+                    color: theme.colorScheme.primary),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15)),
+                    const SizedBox(height: 2),
+                    Text(subtitle,
+                        style:
+                            TextStyle(color: Colors.grey[700], fontSize: 12)),
+                  ],
+                ),
+              ),
+              Icon(Icons.call, color: theme.colorScheme.primary),
+            ],
+          ),
+        ),
       ),
     );
   }
