@@ -47,12 +47,8 @@ class _PredictionScreenState extends State<PredictionScreen> {
   }
 
   // ── Translation helpers for backend-origin fixed-set values ──
-  // The reason sentence (rec.reason) is a dynamically generated
-  // English sentence from the Flask backend with embedded numbers
-  // (e.g. "Price predicted to rise by 4.2% next week.") — this is
-  // left in English since machine-translating a number-embedded
-  // sentence risks mistranslation. Fixed-set labels below are
-  // translated safely.
+  // Fixed-set labels from the backend are translated below. The reason
+  // sentence (rec.reason) is rebuilt in Sinhala by _reasonText().
   String _recLabelSi(String rec) => switch (rec) {
     'Sell Now'    => 'දැන් විකුණන්න',
     'Wait'        => 'රැඳී සිටින්න',
@@ -81,6 +77,41 @@ class _PredictionScreenState extends State<PredictionScreen> {
   };
   String _monthLabel(String month) => _si ? (_monthSi[month] ?? month) : month;
 
+  // ── Price formatting that follows the selected language ──
+  // English: "Rs. 1800/kg"   Sinhala: "රු. 1800/කි.ග්‍රෑ."
+  String _money(double v) =>
+      _si ? 'රු. ${v.toStringAsFixed(0)}' : 'Rs. ${v.toStringAsFixed(0)}';
+  String _moneyPerKg(double v) => _si
+      ? 'රු. ${v.toStringAsFixed(0)}/කි.ග්‍රෑ.'
+      : 'Rs. ${v.toStringAsFixed(0)}/kg';
+
+  // ── Recommendation reason in the selected language ──
+  // The backend sends an English sentence with live numbers
+  // (e.g. "Price predicted to rise by 9.2% next week."). The four
+  // possible sentence shapes are recognised and rebuilt in Sinhala
+  // with the same number; anything unrecognised is shown unchanged.
+  String _reasonText(String reason) {
+    if (!_si) return reason;
+    final rise = RegExp(r'rise by ([0-9]+(?:\.[0-9]+)?)%').firstMatch(reason);
+    if (rise != null) {
+      return 'ඊළඟ සතියේ මිල ${rise.group(1)}%කින් ඉහළ යනු ඇතැයි අනුමාන කෙරේ.';
+    }
+    final fall = RegExp(r'fall by ([0-9]+(?:\.[0-9]+)?)%').firstMatch(reason);
+    if (fall != null) {
+      return 'ඊළඟ සතියේ මිල ${fall.group(1)}%කින් පහත වැටෙනු ඇතැයි අනුමාන කෙරේ.';
+    }
+    if (reason.contains('remain stable')) {
+      return 'ඊළඟ සතියේ මිල ස්ථාවරව පවතිනු ඇතැයි අපේක්ෂා කෙරේ.';
+    }
+    final harvest =
+        RegExp(r'^(.*) is in its harvest season \((.*)\)\.?$').firstMatch(reason);
+    if (harvest != null) {
+      return '${localizedCrop(harvest.group(1)!, true)} දැන් අස්වනු කාලයයි '
+             '(${_seasonSi(harvest.group(2)!)}).';
+    }
+    return reason;
+  }
+
   PredictionResult?     _prediction;
   RecommendationResult? _recommendation;
   HarvestStatus?        _harvestStatus;
@@ -88,13 +119,6 @@ class _PredictionScreenState extends State<PredictionScreen> {
   List<PriceHistoryEntry> _history     = []; // filtered subset
   bool   _loading = true;
   String? _error;
-
-  // Model accuracy note (MAE, in Rs/kg) — null until loaded, or if
-  // unavailable for any reason. This is supplementary, honest
-  // context about the model's general historical accuracy, not a
-  // per-prediction confidence score, so its absence should never
-  // block or affect the main prediction display.
-  double? _modelMae;
 
   // Date filter
   DateTime? _filterFrom;
@@ -107,35 +131,8 @@ class _PredictionScreenState extends State<PredictionScreen> {
     _filterLabel = _si ? 'පසුගිය සති 16' : 'Last 16 weeks';
     _loadAll();
     _loadLanguage();
-    _loadModelAccuracy();
     // Register for price alerts — works without login
     _registerNotifications();
-  }
-
-  // Fetches the deployed model's accuracy (MAE) for the honest
-  // accuracy note. Deliberately separate from _loadAll() and its own
-  // try/catch — if this fails for any reason, the note just doesn't
-  // show; it must never affect or block the main prediction display.
-  Future<void> _loadModelAccuracy() async {
-    try {
-      final res = await ApiService.getModelMetrics();
-      if (res['success'] != true) return;
-      final models = (res['models'] as List?) ?? [];
-      if (models.isEmpty) return;
-      // Multiple models are compared during training (Linear
-      // Regression, Random Forest, XGBoost) but only one is actually
-      // deployed — match the one currently used for predictions.
-      final active = models.firstWhere(
-        (m) => (m['model'] ?? '').toString().toLowerCase().contains('xgb'),
-        orElse: () => models.first,
-      );
-      final mae = active['mae'];
-      if (mae != null && mounted) {
-        setState(() => _modelMae = (mae as num).toDouble());
-      }
-    } catch (_) {
-      // Silently unavailable — the accuracy note just won't show.
-    }
   }
 
   Future<void> _loadLanguage() async {
@@ -306,7 +303,6 @@ class _PredictionScreenState extends State<PredictionScreen> {
                 Expanded(child: Text(_si ? 'මිල ඉතිහාසය පෙරහන් කරන්න' : 'Filter Price History',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
                 IconButton(icon: const Icon(Icons.close),
-                    tooltip: _si ? 'වසන්න' : 'Close',
                     onPressed: () => Navigator.pop(ctx)),
               ]),
               const SizedBox(height: 16),
@@ -355,7 +351,6 @@ class _PredictionScreenState extends State<PredictionScreen> {
                 trailing: tempFrom != null
                     ? IconButton(
                         icon: const Icon(Icons.clear, size: 18),
-                        tooltip: _si ? 'සිට දිනය ඉවත් කරන්න' : 'Clear from date',
                         onPressed: () => setModalState(() => tempFrom = null))
                     : null,
               ),
@@ -378,7 +373,6 @@ class _PredictionScreenState extends State<PredictionScreen> {
                 trailing: tempTo != null
                     ? IconButton(
                         icon: const Icon(Icons.clear, size: 18),
-                        tooltip: _si ? 'දක්වා දිනය ඉවත් කරන්න' : 'Clear to date',
                         onPressed: () => setModalState(() => tempTo = null))
                     : null,
               ),
@@ -519,30 +513,14 @@ class _PredictionScreenState extends State<PredictionScreen> {
           Text(_si ? _recLabelSi(rec.recommendation) : rec.recommendation,
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color)),
           const SizedBox(height: 8),
-          // NOTE: rec.reason is a dynamically generated sentence from the
-          // backend (embeds live numbers) — left in English to avoid
-          // mistranslating a number-embedded sentence client-side.
-          Text(rec.reason,
+          // rec.reason comes from the backend in English with live numbers;
+          // _reasonText() shows it in Sinhala when Sinhala is selected.
+          Text(_reasonText(rec.reason),
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, color: Colors.grey[700])),
         ]),
       ),
     );
-  }
-
-  // Builds the honest accuracy note text — Rs MAE plus the SAME error
-  // expressed as a percentage of the current price. The percentage is
-  // NOT a separate statistical metric, just a relative view of the
-  // identical Rs figure, so it can't say anything the Rs number
-  // doesn't already honestly say.
-  String _buildAccuracyNote(double lastKnownPrice) {
-    final mae = _modelMae!;
-    final pctText = lastKnownPrice > 0
-        ? ' (≈${(mae / lastKnownPrice * 100).toStringAsFixed(1)}% ${_si ? "වර්තමාන මිලෙන්" : "of current price"})'
-        : '';
-    return _si
-        ? 'සාමාන්‍යයෙන් අනාවැකි සත්‍ය මිලට ආසන්න වන්නේ Rs. ${mae.toStringAsFixed(0)}/kg පමණ පරාසයකිනි$pctText (පසුගිය දත්ත මත පදනම්ව).'
-        : 'Predictions are typically within about Rs. ${mae.toStringAsFixed(0)}/kg$pctText of the actual price, based on past performance.';
   }
 
   Widget _buildPredictionCard() {
@@ -560,13 +538,13 @@ class _PredictionScreenState extends State<PredictionScreen> {
           Row(children: [
             Expanded(child: _buildPriceCell(
                 _si ? 'දන්නා අවසන් මිල' : 'Last known price',
-                'Rs. ${pred.lastKnownPrice.toStringAsFixed(0)}/kg',
+                _moneyPerKg(pred.lastKnownPrice),
                 _formatDate(pred.lastKnownDate),
                 Colors.grey[700]!)),
             const SizedBox(width: 12),
             Expanded(child: _buildPriceCell(
                 _si ? 'ඊළඟ සතියේ අනාවැකිය' : 'Predicted next week',
-                'Rs. ${pred.predictedPrice.toStringAsFixed(0)}/kg',
+                _moneyPerKg(pred.predictedPrice),
                 _formatDate(pred.predictedForDate),
                 isUp ? Colors.green[700]! : Colors.red[700]!)),
           ]),
@@ -577,7 +555,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
             const SizedBox(width: 8),
             Text(
               '${isUp ? '+' : ''}${pred.priceChangePct.toStringAsFixed(2)}% '
-              '(Rs. ${pred.priceChange.toStringAsFixed(0)})',
+              '(${_money(pred.priceChange)})',
               style: TextStyle(
                   color: isUp ? Colors.green[700] : Colors.red[700],
                   fontWeight: FontWeight.bold),
@@ -587,31 +565,6 @@ class _PredictionScreenState extends State<PredictionScreen> {
                 _si ? 'මෝසම: ${_seasonSi(pred.season)}' : 'Season: ${pred.season}',
                 style: TextStyle(color: Colors.grey[600], fontSize: 13)),
           ]),
-          // Honest, plain-language accuracy note — deliberately small
-          // and secondary (not competing visually with the actual
-          // prediction), and framed as a GENERAL model statistic from
-          // testing, not a promise about this specific prediction.
-          // Simply doesn't appear if the data wasn't available.
-          //
-          // The percentage shown alongside Rs is NOT a separately
-          // computed statistical metric (e.g. NOT R², which measures
-          // goodness-of-fit and shouldn't be casually called an
-          // "accuracy %") — it's the SAME Rs error expressed relative
-          // to the current price, giving an honest, intuitive sense
-          // of scale without overclaiming precision.
-          if (_modelMae != null) ...[
-            const SizedBox(height: 10),
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Icon(Icons.info_outline, size: 14, color: Colors.grey[500]),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  _buildAccuracyNote(pred.lastKnownPrice),
-                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                ),
-              ),
-            ]),
-          ],
         ]),
       ),
     );
@@ -797,7 +750,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
                   leftTitles: AxisTitles(sideTitles: SideTitles(
                     showTitles: true, reservedSize: 56,
                     getTitlesWidget: (v, _) => Text(
-                        'Rs.${v.toInt()}',
+                        _si ? 'රු.${v.toInt()}' : 'Rs.${v.toInt()}',
                         style: const TextStyle(fontSize: 9)),
                   )),
                   bottomTitles: const AxisTitles(
@@ -826,10 +779,10 @@ class _PredictionScreenState extends State<PredictionScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _statPill(_si ? 'අවම' : 'Min', 'Rs.${minY.toStringAsFixed(0)}', Colors.red[700]!),
-                _statPill(_si ? 'උපරිම' : 'Max', 'Rs.${maxY.toStringAsFixed(0)}', Colors.green[700]!),
+                _statPill(_si ? 'අවම' : 'Min', _money(minY), Colors.red[700]!),
+                _statPill(_si ? 'උපරිම' : 'Max', _money(maxY), Colors.green[700]!),
                 _statPill(_si ? 'සාමාන්‍ය' : 'Avg',
-                    'Rs.${(_history.map((e) => e.avgPrice).reduce((a,b) => a+b) / _history.length).toStringAsFixed(0)}',
+                    _money(_history.map((e) => e.avgPrice).reduce((a,b) => a+b) / _history.length),
                     Colors.blue[700]!),
               ],
             ),
